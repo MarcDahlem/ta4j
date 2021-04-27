@@ -23,18 +23,24 @@
  */
 package org.ta4j.core;
 
-import java.util.ArrayList;
-import java.util.List;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.ta4j.core.cost.CostModel;
+import org.ta4j.core.cost.ZeroCostModel;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.reports.TradingStatement;
 import org.ta4j.core.reports.TradingStatementGenerator;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * This class enables backtesting of multiple strategies and comparing them to
  * see which is the best.
  */
 public class BacktestExecutor {
+
+    private static final Logger LOG = LoggerFactory.getLogger(BacktestExecutor.class);
 
     private final TradingStatementGenerator tradingStatementGenerator;
     private final BarSeriesManager seriesManager;
@@ -43,14 +49,23 @@ public class BacktestExecutor {
         this(series, new TradingStatementGenerator());
     }
 
+    public BacktestExecutor(BarSeries series, CostModel transactionCostModel, CostModel holdingCostModel) {
+        this(series, new TradingStatementGenerator(), transactionCostModel, holdingCostModel);
+    }
+
     public BacktestExecutor(BarSeries series, TradingStatementGenerator tradingStatementGenerator) {
-        this.seriesManager = new BarSeriesManager(series);
+        this(series, tradingStatementGenerator, new ZeroCostModel(), new ZeroCostModel());
+    }
+
+    public BacktestExecutor(BarSeries series, TradingStatementGenerator tradingStatementGenerator,
+            CostModel transactionCostModel, CostModel holdingCostModel) {
+        this.seriesManager = new BarSeriesManager(series, transactionCostModel, holdingCostModel);
         this.tradingStatementGenerator = tradingStatementGenerator;
     }
 
     /**
      * Executes given strategies and returns trading statements.
-     * 
+     *
      * @param strategies the strategies
      * @param amount     the amount used to open/close the position
      */
@@ -61,14 +76,17 @@ public class BacktestExecutor {
     /**
      * Executes given strategies with specified trade type to open the position and
      * return the trading statements.
-     * 
+     *
      * @param strategies the strategies
      * @param amount     the amount used to open/close the position
      * @param tradeType  the {@link Trade.TradeType} used to open the position
      */
     public List<TradingStatement> execute(List<Strategy> strategies, Num amount, Trade.TradeType tradeType) {
         final List<TradingStatement> tradingStatements = new ArrayList<>(strategies.size());
+        int counter = 0;
         for (Strategy strategy : strategies) {
+            counter++;
+            LOG.info("Executing strategy " + counter + "/" + strategies.size());
             final TradingRecord tradingRecord = seriesManager.run(strategy, tradeType, amount);
             final TradingStatement tradingStatement = tradingStatementGenerator.generate(strategy, tradingRecord,
                     seriesManager.getBarSeries());

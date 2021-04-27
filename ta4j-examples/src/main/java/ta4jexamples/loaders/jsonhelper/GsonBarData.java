@@ -54,6 +54,6 @@ public class GsonBarData {
     public void addTo(BaseBarSeries barSeries) {
         Instant endTimeInstant = Instant.ofEpochMilli(endTime);
         ZonedDateTime endBarTime = ZonedDateTime.ofInstant(endTimeInstant, ZoneId.systemDefault());
-        barSeries.addBar(endBarTime, openPrice, highPrice, lowPrice, closePrice, volume, amount);
+        barSeries.addBar(endBarTime, openPrice, highPrice, lowPrice, closePrice);
     }
 }

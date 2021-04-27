@@ -3,7 +3,7 @@
     <parent>
         <groupId>org.ta4j</groupId>
         <artifactId>ta4j-parent</artifactId>
-        <version>0.14-SNAPSHOT</version>
+        <version>0.15-SNAPSHOT</version>
     </parent>
     <artifactId>ta4j-examples</artifactId>
 
@@ -11,7 +11,7 @@
     <description>Provides examples that demonstrate how to use ta4j</description>
 
     <dependencies>
-        
+
         <!-- Test dependencies -->
         <dependency>
             <groupId>junit</groupId>
@@ -19,11 +19,11 @@
             <version>4.12</version>
             <scope>test</scope>
         </dependency>
-        
+
         <dependency>
             <groupId>org.ta4j</groupId>
             <artifactId>ta4j-core</artifactId>
-            <version>0.14-SNAPSHOT</version>
+            <version>0.15-SNAPSHOT</version>
         </dependency>
 
         <dependency>
