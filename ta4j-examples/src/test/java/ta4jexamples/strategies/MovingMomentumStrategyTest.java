@@ -23,8 +23,7 @@
  */
 package ta4jexamples.strategies;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.google.gson.*;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +44,7 @@ import ta4jexamples.loaders.JsonBarsSerializer;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.util.*;
@@ -79,7 +79,7 @@ public class MovingMomentumStrategyTest {
         BigDecimal buyFeeFactor = BigDecimal.ONE.add(buyFee);
         BigDecimal sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
 
-        double upPercentage = 1.309;
+        double upPercentage = 1.1;
         int lookback_max = 500;
 
         for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
@@ -287,7 +287,14 @@ public class MovingMomentumStrategyTest {
     }
 
     private void store(Collection<TradingStatement> results, String suffix) {
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+
+        JsonSerializer<Num> numSerializer = new JsonSerializer<Num>() {
+            @Override
+            public JsonElement serialize(Num src, Type typeOfSrc, JsonSerializationContext context) {
+                return context.serialize(src.getDelegate());
+            }
+        };
+        Gson gson = new GsonBuilder().registerTypeAdapter(Num.class, numSerializer).setPrettyPrinting().create();
         FileWriter writer = null;
         try {
 
