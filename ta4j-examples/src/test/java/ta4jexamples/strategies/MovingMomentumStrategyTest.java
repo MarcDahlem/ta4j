@@ -48,8 +48,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.LinkedTransferQueue;
 
 public class MovingMomentumStrategyTest {
 
@@ -71,7 +69,7 @@ public class MovingMomentumStrategyTest {
         LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
         HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
 
-        List<Strategy> strategies = new LinkedList<>();
+        Queue<Strategy> strategies = new LinkedList<>();
 
 
         StochasticOscillatorKIndicator stochasticOscillaltorK = new StochasticOscillatorKIndicator(series, 140);
@@ -82,12 +80,14 @@ public class MovingMomentumStrategyTest {
         BigDecimal sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
 
         double upPercentage = 1.309;
+        int lookback_max = 500;
 
-        for (long i = 1; i < 500; i = Math.round(Math.ceil(i * upPercentage))) {
+        for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
-                for (long k = 1; k < 500; k = Math.round(Math.ceil(k * upPercentage))) {
+                for (long k = 1; k < lookback_max; k = Math.round(Math.ceil(k * upPercentage))) {
                     for (long l = 1; l < k; l = Math.round(Math.ceil(l * upPercentage))) {
-                        LOG.info("i(" + i + "), j(" + j + "), k(" + k + "),l(" + l + ")");
+                        String currentStrategyName = "i(" + i + "), j(" + j + "), k(" + k + "),l(" + l + ")";
+                        LOG.info(currentStrategyName);
                         EMAIndicator buyIndicatorLong = new EMAIndicator(bidPriceIndicator, Math.toIntExact(i));
                         TransformIndicator buyIndicatorShort = TransformIndicator.multiply(new EMAIndicator(bidPriceIndicator, Math.toIntExact(j)), sellFeeFactor);
 
@@ -99,7 +99,7 @@ public class MovingMomentumStrategyTest {
 
                         Rule exitRule = new CrossedDownIndicatorRule(sellIndicatorShort, sellIndicatorLong) // Trend
                                 /*.and(new OverIndicatorRule(stochasticOscillaltorK, 80)) // Signal 1*/;/*.and(new UnderIndicatorRule(macd, emaMacd)); // Signal 2*/
-                        strategies.add(new BaseStrategy("i(" + i + "), j(" + j + "), k(" + k + "),l(" + l + ")", entryRule, exitRule));
+                        strategies.offer(new BaseStrategy(currentStrategyName, entryRule, exitRule));
                     }
                 }
             }
@@ -109,13 +109,18 @@ public class MovingMomentumStrategyTest {
         BacktestExecutor bte = new BacktestExecutor(series, new LinearTransactionCostModel(0.0026), new ZeroCostModel());
         List<TradingStatement> result = new LinkedList<>();
         int counter = 0;
-        for (Strategy strat : strategies) {
+        int originalSize = strategies.size();
+        while(strategies.size() >0) {
+            Strategy strat = strategies.poll();
             counter++;
-            LOG.info("Executing ta4j strategy " + counter + "/" + strategies.size());
+            LOG.info("Executing ta4j strategy " + counter + "/" + originalSize);
             LinkedList<Strategy> listToBeExecuted = new LinkedList<>();
             listToBeExecuted.add(strat);
             result.addAll(bte.execute(listToBeExecuted, series.numOf(25), Trade.TradeType.BUY));
             strat.destroy();
+            if (counter %300 == 0) {
+                System.gc();
+            }
         }
 
         result.sort((o1, o2) -> {
@@ -137,6 +142,7 @@ public class MovingMomentumStrategyTest {
         });
         LOG.info(printReport(result.subList(0, 1)));
         LOG.info(printReport(result.subList(result.size() - 10, result.size())));
+        store(result, "_Ta4jMacd_" + System.currentTimeMillis() + "_steps_" + upPercentage + "_maxLookback_" + lookback_max);
     }
 
     @Test
