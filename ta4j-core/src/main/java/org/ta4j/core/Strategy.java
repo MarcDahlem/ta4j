@@ -146,4 +146,6 @@ public interface Strategy {
     default boolean shouldExit(int index, TradingRecord tradingRecord) {
         return !isUnstableAt(index) && getExitRule().isSatisfied(index, tradingRecord);
     }
+
+    void destroy();
 }

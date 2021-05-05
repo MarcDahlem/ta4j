@@ -28,7 +28,10 @@ import org.slf4j.LoggerFactory;
 import org.ta4j.core.Trade.TradeType;
 import org.ta4j.core.cost.CostModel;
 import org.ta4j.core.cost.ZeroCostModel;
+import org.ta4j.core.indicators.SellIndicator;
 import org.ta4j.core.num.Num;
+
+import java.util.Map;
 
 /**
  * A manager for {@link BarSeries} objects.
@@ -158,6 +161,10 @@ public class BarSeriesManager {
         return run(strategy, tradeType, amount, barSeries.getBeginIndex(), barSeries.getEndIndex());
     }
 
+    public TradingRecord run(Map.Entry<Strategy, SellIndicator> strategy, TradeType tradeType, Num amount) {
+        return run(strategy, tradeType, amount, barSeries.getBeginIndex(), barSeries.getEndIndex());
+    }
+
     /**
      * Runs the provided strategy over the managed series (from startIndex to
      * finishIndex).
@@ -193,6 +200,48 @@ public class BarSeriesManager {
                 // For each bar after the end index of this run...
                 // --> Trying to close the last position
                 if (strategy.shouldOperate(i, tradingRecord)) {
+                    tradingRecord.operate(i, barSeries.getBar(i).getClosePrice(), amount);
+                    break;
+                }
+            }
+        }
+        return tradingRecord;
+    }
+
+    public TradingRecord run(Map.Entry<Strategy, SellIndicator> strategy, TradeType tradeType, Num amount, int startIndex, int finishIndex) {
+
+        int runBeginIndex = Math.max(startIndex, barSeries.getBeginIndex());
+        int runEndIndex = Math.min(finishIndex, barSeries.getEndIndex());
+
+        log.trace("Running strategy (indexes: {} -> {}): {} (starting with {})", runBeginIndex, runEndIndex, strategy.getKey(),
+                tradeType);
+        BaseTradingRecord tradingRecord = new BaseTradingRecord(tradeType, transactionCostModel, holdingCostModel);
+        for (int i = runBeginIndex; i <= runEndIndex; i++) {
+            // For each bar between both indexes...
+            if (strategy.getKey().shouldOperate(i, tradingRecord)) {
+                if (tradingRecord.getCurrentPosition().isNew()) {
+                    strategy.getValue().registerBuyOrderExecution(i);
+                } else {
+                    if (tradingRecord.getCurrentPosition().isOpened()) {
+                        strategy.getValue().registerSellOrderExecution(i);
+                    } else {
+                        throw new IllegalStateException("Should operate but neither opened nor new position available");
+                    }
+                }
+                tradingRecord.operate(i, barSeries.getBar(i).getClosePrice(), amount);
+            }
+        }
+
+        if (!tradingRecord.isClosed()) {
+            // If the last position is still opened, we search out of the run end index.
+            // May works if the end index for this run was inferior to the actual number of
+            // bars
+            int seriesMaxSize = Math.max(barSeries.getEndIndex() + 1, barSeries.getBarData().size());
+            for (int i = runEndIndex + 1; i < seriesMaxSize; i++) {
+                // For each bar after the end index of this run...
+                // --> Trying to close the last position
+                if (strategy.getKey().shouldOperate(i, tradingRecord)) {
+                    strategy.getValue().registerSellOrderExecution(i);
                     tradingRecord.operate(i, barSeries.getBar(i).getClosePrice(), amount);
                     break;
                 }

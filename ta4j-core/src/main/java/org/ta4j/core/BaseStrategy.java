@@ -154,6 +154,12 @@ public class BaseStrategy implements Strategy {
     }
 
     @Override
+    public void destroy() {
+        this.entryRule = null;
+        this.exitRule = null;
+    }
+
+    @Override
     public Strategy and(Strategy strategy) {
         String andName = "and(" + name + "," + strategy.getName() + ")";
         int unstable = Math.max(unstablePeriod, strategy.getUnstablePeriod());

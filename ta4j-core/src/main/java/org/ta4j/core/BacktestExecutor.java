@@ -27,12 +27,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.ta4j.core.cost.CostModel;
 import org.ta4j.core.cost.ZeroCostModel;
+import org.ta4j.core.indicators.SellIndicator;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.reports.TradingStatement;
 import org.ta4j.core.reports.TradingStatementGenerator;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * This class enables backtesting of multiple strategies and comparing them to
@@ -83,12 +85,22 @@ public class BacktestExecutor {
      */
     public List<TradingStatement> execute(List<Strategy> strategies, Num amount, Trade.TradeType tradeType) {
         final List<TradingStatement> tradingStatements = new ArrayList<>(strategies.size());
-        int counter = 0;
+
         for (Strategy strategy : strategies) {
-            counter++;
-            LOG.info("Executing strategy " + counter + "/" + strategies.size());
             final TradingRecord tradingRecord = seriesManager.run(strategy, tradeType, amount);
             final TradingStatement tradingStatement = tradingStatementGenerator.generate(strategy, tradingRecord,
+                    seriesManager.getBarSeries());
+            tradingStatements.add(tradingStatement);
+        }
+        return tradingStatements;
+    }
+
+    public List<TradingStatement> execute(Map<Strategy, SellIndicator> strategies, Num amount, Trade.TradeType tradeType) {
+        final List<TradingStatement> tradingStatements = new ArrayList<>(strategies.size());
+
+        for (Map.Entry<Strategy, SellIndicator> strategy : strategies.entrySet()) {
+            final TradingRecord tradingRecord = seriesManager.run(strategy, tradeType, amount);
+            final TradingStatement tradingStatement = tradingStatementGenerator.generate(strategy.getKey(), tradingRecord,
                     seriesManager.getBarSeries());
             tradingStatements.add(tradingStatement);
         }
