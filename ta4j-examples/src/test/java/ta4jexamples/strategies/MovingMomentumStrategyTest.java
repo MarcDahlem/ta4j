@@ -66,8 +66,8 @@ public class MovingMomentumStrategyTest {
         BigDecimal buyFeeFactor = BigDecimal.ONE.add(buyFee);
         BigDecimal sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
 
-        double upPercentage = 1.9;
-        int lookback_max = 100;
+        double upPercentage = 1.1545;
+        int lookback_max = 500;
 
         Queue<Map.Entry<List<Map.Entry<Strategy, BarSeries>>, String>> strategies = new LinkedList<>();
 
@@ -190,6 +190,7 @@ public class MovingMomentumStrategyTest {
         result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\XRPEUR1619822902408.json"));
         result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\XRPEUR1619898650211.json"));
         result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\XRPEUR1619943515150.json"));
+        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\XRPEUR1620317267197.json"));
         return result;
 
     }
