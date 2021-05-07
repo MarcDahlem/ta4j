@@ -78,6 +78,11 @@ public abstract class CachedIndicator<T> extends AbstractIndicator<T> {
     if (cache.containsKey(index)) {
       return cache.get(index);
     }
+    final int removedBarsCount = getBarSeries().getRemovedBarsCount();
+
+    if (index < removedBarsCount) {
+      return calculate(0);
+    }
     T result = calculate(index);
     if (this.getBarSeries() != null && index != this.getBarSeries().getEndIndex()) {
       cache.put(index, result);
