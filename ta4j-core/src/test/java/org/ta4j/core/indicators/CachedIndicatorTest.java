@@ -193,4 +193,13 @@ public class CachedIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, N
         assertNumEquals(2, closePrice.getValue(1));
     }
 
+    @Test
+    public void cacheWorksForReversalValueAccess() {
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+
+        assertNumEquals(5, closePrice.getValue(6));
+        assertNumEquals(2, closePrice.getValue(1));
+        assertNumEquals(2, closePrice.getValue(1));
+    }
+
 }
