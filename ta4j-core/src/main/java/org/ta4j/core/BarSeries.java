@@ -139,11 +139,6 @@ public interface BarSeries extends Serializable {
     void setMaximumBarCount(int maximumBarCount);
 
     /**
-     * @return the number of removed bars
-     */
-    int getRemovedBarsCount();
-
-    /**
      * Adds a bar at the end of the series.
      *
      * Begin index set to 0 if it wasn't initialized.<br>

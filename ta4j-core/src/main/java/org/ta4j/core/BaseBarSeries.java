@@ -62,25 +62,14 @@ public class BaseBarSeries implements BarSeries {
      */
     private final String name;
     /**
-     * List of bars
+     * The actual bars. To old bars are automatically removed by the cache
      */
-    private final List<Bar> bars;
-    /**
-     * Begin index of the bar series
-     */
-    private int seriesBeginIndex;
-    /**
-     * End index of the bar series
-     */
-    private int seriesEndIndex;
+    private final Ta4jCache<Bar> barCache;
+
     /**
      * Maximum number of bars for the bar series
      */
     private int maximumBarCount = Integer.MAX_VALUE;
-    /**
-     * Number of removed bars
-     */
-    private int removedBarsCount = 0;
     /**
      * True if the current series is constrained (i.e. its indexes cannot change),
      * false otherwise
@@ -175,12 +164,10 @@ public class BaseBarSeries implements BarSeries {
     BaseBarSeries(String name, List<Bar> bars, int seriesBeginIndex, int seriesEndIndex, boolean constrained,
             Function<Number, Num> numFunction) {
         this.name = name;
+        this.barCache = new Ta4jCache<>(this);
 
-        this.bars = bars;
         if (bars.isEmpty()) {
             // Bar list empty
-            this.seriesBeginIndex = -1;
-            this.seriesEndIndex = -1;
             this.constrained = false;
             this.numFunction = numFunction;
             return;
@@ -200,8 +187,12 @@ public class BaseBarSeries implements BarSeries {
         if (seriesEndIndex >= bars.size()) {
             throw new IllegalArgumentException("End index must be < to the bar list size");
         }
-        this.seriesBeginIndex = seriesBeginIndex;
-        this.seriesEndIndex = seriesEndIndex;
+
+        int currentBarIndex = seriesBeginIndex;
+        for(Bar bar: bars) {
+            barCache.add(currentBarIndex, bar);
+            currentBarIndex++;
+        }
         this.constrained = constrained;
     }
 
@@ -224,8 +215,8 @@ public class BaseBarSeries implements BarSeries {
      * @return a message for an OutOfBoundsException
      */
     private static String buildOutOfBoundsMessage(BaseBarSeries series, int index) {
-        return String.format("Size of series: %s bars, %s bars removed, index = %s", series.bars.size(),
-                series.removedBarsCount, index);
+        return String.format("Size of series: %s bars, %s bars removed, index = %s", series.barCache.size(),
+                series.barCache.firstAvailableIndex(), index);
     }
 
     /**
@@ -254,10 +245,10 @@ public class BaseBarSeries implements BarSeries {
             throw new IllegalArgumentException(
                     String.format("the endIndex: %s must be greater than startIndex: %s", endIndex, startIndex));
         }
-        if (!bars.isEmpty()) {
-            int start = Math.max(startIndex - getRemovedBarsCount(), this.getBeginIndex());
-            int end = Math.min(endIndex - getRemovedBarsCount(), this.getEndIndex() + 1);
-            return new BaseBarSeries(getName(), cut(bars, start, end), numFunction);
+        if (!barCache.isEmpty()) {
+            int start = Math.max(startIndex - barCache.firstAvailableIndex(), this.getBeginIndex());
+            int end = Math.min(endIndex - barCache.firstAvailableIndex(), this.getEndIndex() + 1);
+            return new BaseBarSeries(getName(), cut(getBarData(), start, end), numFunction);
         }
         return new BaseBarSeries(name, numFunction);
 
@@ -316,47 +307,38 @@ public class BaseBarSeries implements BarSeries {
 
     @Override
     public Bar getBar(int i) {
-        int innerIndex = i - removedBarsCount;
-        if (innerIndex < 0) {
-            if (i < 0) {
-                // Cannot return the i-th bar if i < 0
-                throw new IndexOutOfBoundsException(buildOutOfBoundsMessage(this, i));
-            }
-            log.trace("Bar series `{}` ({} bars): bar {} already removed, use {}-th instead", name, bars.size(), i,
-                    removedBarsCount);
-            if (bars.isEmpty()) {
-                throw new IndexOutOfBoundsException(buildOutOfBoundsMessage(this, removedBarsCount));
-            }
-            innerIndex = 0;
-        } else if (innerIndex >= bars.size()) {
-            // Cannot return the n-th bar if n >= bars.size()
+        if(barCache.isEmpty()) {
             throw new IndexOutOfBoundsException(buildOutOfBoundsMessage(this, i));
         }
-        return bars.get(innerIndex);
+        if (i<barCache.firstAvailableIndex()) {
+            log.trace("Bar series `{}` ({} bars): bar {} already removed, use {}-th instead", name, barCache.size(), i,
+                    barCache.firstAvailableIndex());
+            return barCache.get(barCache.firstAvailableIndex());
+        }
+        if(!barCache.contains(i)) {
+            throw new IndexOutOfBoundsException(buildOutOfBoundsMessage(this, i));
+        }
+        return barCache.get(i);
     }
 
     @Override
     public int getBarCount() {
-        if (seriesEndIndex < 0) {
-            return 0;
-        }
-        final int startIndex = Math.max(removedBarsCount, seriesBeginIndex);
-        return seriesEndIndex - startIndex + 1;
+        return barCache.size();
     }
 
     @Override
     public List<Bar> getBarData() {
-        return bars;
+        return barCache.values();
     }
 
     @Override
     public int getBeginIndex() {
-        return seriesBeginIndex;
+        return barCache.firstAvailableIndex();
     }
 
     @Override
     public int getEndIndex() {
-        return seriesEndIndex;
+        return barCache.lastAvailableIndex();
     }
 
     @Override
@@ -373,12 +355,7 @@ public class BaseBarSeries implements BarSeries {
             throw new IllegalArgumentException("Maximum bar count must be strictly positive");
         }
         this.maximumBarCount = maximumBarCount;
-        removeExceedingBars();
-    }
-
-    @Override
-    public int getRemovedBarsCount() {
-        return removedBarsCount;
+        barCache.removeFirstEntriesIfNeeded();
     }
 
     /**
@@ -394,13 +371,13 @@ public class BaseBarSeries implements BarSeries {
                     String.format("Cannot add Bar with data type: %s to series with data" + "type: %s",
                             bar.getClosePrice().getClass(), numOf(1).getClass()));
         }
-        if (!bars.isEmpty()) {
+        if (!barCache.isEmpty()) {
             if (replace) {
-                bars.set(bars.size() - 1, bar);
+                barCache.add(barCache.lastAvailableIndex(), bar);
                 return;
             }
-            final int lastBarIndex = bars.size() - 1;
-            ZonedDateTime seriesEndTime = bars.get(lastBarIndex).getEndTime();
+            final int lastBarIndex = barCache.lastAvailableIndex();
+            ZonedDateTime seriesEndTime = barCache.get(lastBarIndex).getEndTime();
             if (!bar.getEndTime().isAfter(seriesEndTime)) {
                 throw new IllegalArgumentException(
                         String.format("Cannot add a bar with end time:%s that is <= to series end time: %s",
@@ -408,13 +385,7 @@ public class BaseBarSeries implements BarSeries {
             }
         }
 
-        bars.add(bar);
-        if (seriesBeginIndex == -1) {
-            // Begin index set to 0 only if it wasn't initialized
-            seriesBeginIndex = 0;
-        }
-        seriesEndIndex++;
-        removeExceedingBars();
+        barCache.add(barCache.lastAvailableIndex()+1, bar);
     }
 
     @Override
@@ -465,22 +436,6 @@ public class BaseBarSeries implements BarSeries {
     @Override
     public void addPrice(Num price) {
         getLastBar().addPrice(price);
-    }
-
-    /**
-     * Removes the N first bars which exceed the maximum bar count.
-     */
-    private void removeExceedingBars() {
-        int barCount = bars.size();
-        if (barCount > maximumBarCount) {
-            // Removing old bars
-            int nbBarsToRemove = barCount - maximumBarCount;
-            for (int i = 0; i < nbBarsToRemove; i++) {
-                bars.remove(0);
-            }
-            // Updating removed bars count
-            removedBarsCount += nbBarsToRemove;
-        }
     }
 
 }

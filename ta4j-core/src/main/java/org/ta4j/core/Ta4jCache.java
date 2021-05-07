@@ -23,6 +23,8 @@
  */
 package org.ta4j.core;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.TreeMap;
 
 public class Ta4jCache<T> {
@@ -34,24 +36,14 @@ public class Ta4jCache<T> {
     }
 
     public boolean contains(int index) {
-        if (index == series.getEndIndex()) {
-            return false;
-        }
         return actualCache.containsKey(index);
     }
 
     public T get(int index) {
-        if (index == series.getEndIndex()) {
-            return null;
-        }
         return actualCache.get(index);
     }
 
     public void add(int index, T result) {
-        if (index == series.getEndIndex()) {
-            // never use cache for last index, as the corresponding bar can be updated
-            return;
-        }
         if (contains(index)) {
             return;
         }
@@ -61,7 +53,7 @@ public class Ta4jCache<T> {
         removeFirstEntriesIfNeeded();
     }
 
-    private void removeFirstEntriesIfNeeded() {
+    public void removeFirstEntriesIfNeeded() {
         int currentLimit = series.getMaximumBarCount();
         while (actualCache.size() > currentLimit) {
             actualCache.pollFirstEntry();
@@ -73,5 +65,24 @@ public class Ta4jCache<T> {
             return -1;
         }
         return actualCache.lastKey();
+    }
+
+    public boolean isEmpty() {
+        return actualCache.isEmpty();
+    }
+
+    public int firstAvailableIndex() {
+        if (actualCache.isEmpty()) {
+            return -1;
+        }
+        return actualCache.firstKey();
+    }
+
+    public int size() {
+        return actualCache.size();
+    }
+
+    public List<T> values() {
+        return new LinkedList<>(actualCache.values());
     }
 }

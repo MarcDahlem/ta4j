@@ -148,7 +148,7 @@ public class CachedIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, N
     public void getValueOnResultsCalculatedFromRemovedBarsShouldReturnFirstRemainingResult() {
         BarSeries barSeries = new MockBarSeries(numFunction, 1, 1, 1, 1, 1);
         barSeries.setMaximumBarCount(3);
-        assertEquals(2, barSeries.getRemovedBarsCount());
+        assertEquals(2, barSeries.getBeginIndex());
 
         SMAIndicator sma = new SMAIndicator(new ClosePriceIndicator(barSeries), 2);
         for (int i = 0; i < 5; i++) {

@@ -81,7 +81,7 @@ public abstract class CachedIndicator<T> extends AbstractIndicator<T> {
         }
 
         // Series is not null
-        final int removedBarsCount = series.getRemovedBarsCount();
+        final int removedBarsCount = series.getBeginIndex();
 
         T result;
         if (index < removedBarsCount) {
@@ -94,7 +94,10 @@ public abstract class CachedIndicator<T> extends AbstractIndicator<T> {
             result = calculate(0);
         } else {
             result = calculate(index);
-            cache.add(index, result);
+            if (index != series.getEndIndex()) {
+                // never use cache for last index, as the corresponding bar can be updated
+                cache.add(index, result);
+            }
         }
         log.trace("{}({}): {}", this, index, result);
         return result;
