@@ -208,22 +208,24 @@ public class BarSeriesManager {
         return tradingRecord;
     }
 
-    public TradingRecord run(Map.Entry<Strategy, SellIndicator> strategy, TradeType tradeType, Num amount, int startIndex, int finishIndex) {
+    public TradingRecord run(Map.Entry<Strategy, SellIndicator> strategyConfig, TradeType tradeType, Num amount, int startIndex, int finishIndex) {
 
         int runBeginIndex = Math.max(startIndex, barSeries.getBeginIndex());
         int runEndIndex = Math.min(finishIndex, barSeries.getEndIndex());
 
-        log.trace("Running strategy (indexes: {} -> {}): {} (starting with {})", runBeginIndex, runEndIndex, strategy.getKey(),
+        Strategy strategy = strategyConfig.getKey();
+        log.trace("Running strategy (indexes: {} -> {}): {} (starting with {})", runBeginIndex, runEndIndex, strategy,
                 tradeType);
         BaseTradingRecord tradingRecord = new BaseTradingRecord(tradeType, transactionCostModel, holdingCostModel);
+        SellIndicator breakEvenIndicator = strategyConfig.getValue();
         for (int i = runBeginIndex; i <= runEndIndex; i++) {
             // For each bar between both indexes...
-            if (strategy.getKey().shouldOperate(i, tradingRecord)) {
+            if (strategy.shouldOperate(i, tradingRecord)) {
                 if (tradingRecord.getCurrentPosition().isNew()) {
-                    strategy.getValue().registerBuyOrderExecution(i);
+                    if (breakEvenIndicator != null) breakEvenIndicator.registerBuyOrderExecution(i);
                 } else {
                     if (tradingRecord.getCurrentPosition().isOpened()) {
-                        strategy.getValue().registerSellOrderExecution(i);
+                        if (breakEvenIndicator != null) breakEvenIndicator.registerSellOrderExecution(i);
                     } else {
                         throw new IllegalStateException("Should operate but neither opened nor new position available");
                     }
@@ -240,8 +242,8 @@ public class BarSeriesManager {
             for (int i = runEndIndex + 1; i < seriesMaxSize; i++) {
                 // For each bar after the end index of this run...
                 // --> Trying to close the last position
-                if (strategy.getKey().shouldOperate(i, tradingRecord)) {
-                    strategy.getValue().registerSellOrderExecution(i);
+                if (strategy.shouldOperate(i, tradingRecord)) {
+                    if (breakEvenIndicator != null) breakEvenIndicator.registerSellOrderExecution(i);
                     tradingRecord.operate(i, barSeries.getBar(i).getClosePrice(), amount);
                     break;
                 }

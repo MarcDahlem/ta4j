@@ -28,6 +28,7 @@ import java.io.FileWriter;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.text.DecimalFormat;
 import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.HashMap;
@@ -53,12 +54,14 @@ import org.ta4j.core.Strategy;
 import org.ta4j.core.Trade;
 import org.ta4j.core.cost.LinearTransactionCostModel;
 import org.ta4j.core.cost.ZeroCostModel;
+import org.ta4j.core.indicators.EMAIndicator;
 import org.ta4j.core.indicators.SellIndicator;
 import org.ta4j.core.indicators.TripleEMAIndicator;
 import org.ta4j.core.indicators.UnstableIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.HighPriceIndicator;
 import org.ta4j.core.indicators.helpers.LowPriceIndicator;
+import org.ta4j.core.indicators.helpers.LowestValueIndicator;
 import org.ta4j.core.indicators.helpers.TransformIndicator;
 import org.ta4j.core.indicators.keltner.KeltnerChannelLowerIndicator;
 import org.ta4j.core.indicators.keltner.KeltnerChannelMiddleIndicator;
@@ -67,7 +70,10 @@ import org.ta4j.core.num.Num;
 import org.ta4j.core.reports.PerformanceReport;
 import org.ta4j.core.reports.PositionStatsReport;
 import org.ta4j.core.reports.TradingStatement;
+import org.ta4j.core.rules.CrossedDownIndicatorRule;
+import org.ta4j.core.rules.CrossedUpIndicatorRule;
 import org.ta4j.core.rules.FixedRule;
+import org.ta4j.core.rules.OverIndicatorRule;
 import org.ta4j.core.rules.UnderIndicatorRule;
 
 import com.google.gson.Gson;
@@ -79,6 +85,7 @@ import ta4jexamples.loaders.JsonBarsSerializer;
 public class IntelligentTa4jBenchmarks {
 
     private static final Logger LOG = LoggerFactory.getLogger(IntelligentTa4jBenchmarks.class);
+    private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("#.########");
     private Set<BarSeries> allSeries;
     private BigDecimal buyFee;
     private BigDecimal sellFee;
@@ -156,24 +163,25 @@ public class IntelligentTa4jBenchmarks {
         );
     }
 
-    /*@Test
+    @Test
     public void testMineTa4j() {
-        Queue<Map.Entry<List<Map.Entry<Strategy, BarSeries>>, String>> strategies = new LinkedList<>();
+        // TODO rework
+        Queue<StrategyBenchmarkConfiguration> strategies = new LinkedList<>();
         for (long i = 26; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 9; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
                 for (long k = 26; k < lookback_max; k = Math.round(Math.ceil(k * upPercentage))) {
                     for (long l = 9; l < k; l = Math.round(Math.ceil(l * upPercentage))) {
                         String currentStrategyName = "i(" + i + "), j(" + j + "), k(" + k + "),l(" + l + ")";
                         LOG.info(currentStrategyName);
-                        List<Map.Entry<Strategy, BarSeries>> strategiesForTheSeries = new LinkedList<>();
+                        List<StrategyConfiguration> strategiesForTheSeries = new LinkedList<>();
                         for (BarSeries series : allSeries) {
                             ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
                             LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
                             HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
 
-                            StochasticOscillatorKIndicator stochasticOscillaltorK = new StochasticOscillatorKIndicator(series, 140);
-                            MACDIndicator macd = new MACDIndicator(closePriceIndicator, 90, 260);
-                            EMAIndicator emaMacd = new EMAIndicator(macd, 180);
+                            //StochasticOscillatorKIndicator stochasticOscillaltorK = new StochasticOscillatorKIndicator(series, 140);
+                            //MACDIndicator macd = new MACDIndicator(closePriceIndicator, 90, 260);
+                            //EMAIndicator emaMacd = new EMAIndicator(macd, 180);
 
 
                             EMAIndicator buyIndicatorLong = new EMAIndicator(bidPriceIndicator, Math.toIntExact(i));
@@ -191,9 +199,9 @@ public class IntelligentTa4jBenchmarks {
                                     //.and(new OverIndicatorRule(stochasticOscillaltorK, 80)) // Signal 1
                                     //.and(new UnderIndicatorRule(macd, emaMacd)); // Signal 2
                                     ;
-                            strategiesForTheSeries.add(new AbstractMap.SimpleEntry<>(new BaseStrategy(currentStrategyName, entryRule, exitRule), series));
+                            strategiesForTheSeries.add(new StrategyConfiguration(new BaseStrategy(currentStrategyName, entryRule, exitRule), series, null));
                         }
-                        strategies.offer(new AbstractMap.SimpleEntry<>(strategiesForTheSeries, currentStrategyName));
+                        strategies.offer(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
                     }
                 }
             }
@@ -202,16 +210,13 @@ public class IntelligentTa4jBenchmarks {
 
         List<TradingStatement> result = simulateStrategies(strategies);
         sortResultsByProfit(result);
-        printAndSaveResults(result, "_Ta4jMacd_");
+        printAndSaveResults(result, "_Ta4jMacd_", null);
     }
 
     @Test
     public void testMineTa4jTrailing() {
-        BarSeries series = JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\barData_1618580976288.json");
-        BigDecimal buyFee = new BigDecimal("0.0026");
-        BigDecimal sellFee = new BigDecimal("0.0026");
-
-        DecimalFormat DECIMAL_FORMAT = new DecimalFormat("#.########");
+        // TODO rework
+        BarSeries series = JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\barData_1618580976288.json");
 
         ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
         LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
@@ -219,10 +224,8 @@ public class IntelligentTa4jBenchmarks {
 
         Queue<Map.Entry<Strategy, SellIndicator>> strategies = new LinkedList<>();
 
-        double upPercentage = 1.309;
-        BigDecimal upPercentageBig = new BigDecimal(upPercentage);
 
-        int lookback_max = 500;
+        BigDecimal upPercentageBig = new BigDecimal(upPercentage);
 
         BigDecimal percentageUpperBound = new BigDecimal("0.1");
 
@@ -277,10 +280,8 @@ public class IntelligentTa4jBenchmarks {
         }
 
         sortResultsByProfit(result);
-        LOG.info(printReport(result.subList(0, 1)));
-        LOG.info(printReport(result.subList(result.size() - 10, result.size())));
-        store(result, "_Ta4jTrailing_" + System.currentTimeMillis() + "_steps_" + upPercentage + "_maxLookback_" + lookback_max + "_maxPercentage_" + DECIMAL_FORMAT.format(percentageUpperBound));
-    }*/
+        printAndSaveResults(result, "_Ta4jTrailing_", percentageUpperBound);
+    }
 
     private void runBenchmarkForTwoVariables(
             String benchmarkName,
@@ -302,12 +303,12 @@ public class IntelligentTa4jBenchmarks {
             }
         }
 
-        List<TradingStatement> result = simulateStrategiesWithBreakEvenIndicator(strategies);
+        List<TradingStatement> result = simulateStrategies(strategies);
         sortResultsByProfit(result);
-        printAndSaveResults(result, "_" + benchmarkName + "_");
+        printAndSaveResults(result, "_" + benchmarkName + "_", null);
     }
 
-    private List<TradingStatement> simulateStrategiesWithBreakEvenIndicator(Queue<StrategyBenchmarkConfiguration> benchmarkConfigurations) {
+    private List<TradingStatement> simulateStrategies(Queue<StrategyBenchmarkConfiguration> benchmarkConfigurations) {
         List<TradingStatement> result = new LinkedList<>();
         int counter = 0;
         int originalSize = benchmarkConfigurations.size();
@@ -337,36 +338,14 @@ public class IntelligentTa4jBenchmarks {
         return result;
     }
 
-    private List<TradingStatement> simulateStrategies(Queue<Map.Entry<List<Map.Entry<Strategy, BarSeries>>, String>> strategies) {
-        List<TradingStatement> result = new LinkedList<>();
-        int counter = 0;
-        int originalSize = strategies.size();
-        while (strategies.size() > 0) {
-            counter++;
-            LOG.info("Executing ta4j strategies " + counter + "/" + originalSize);
-
-            Map.Entry<List<Map.Entry<Strategy, BarSeries>>, String> strats = strategies.poll();
-            List<TradingStatement> currentSeriesResult = new LinkedList<>();
-            for (Map.Entry<Strategy, BarSeries> entry : strats.getKey()) {
-                BacktestExecutor bte = new BacktestExecutor(entry.getValue(), new LinearTransactionCostModel(0.0026), new ZeroCostModel());
-                List<Strategy> toBeExecuted = new LinkedList<>();
-                toBeExecuted.add(entry.getKey());
-                currentSeriesResult.addAll(bte.execute(toBeExecuted, entry.getValue().numOf(25), Trade.TradeType.BUY));
-
-                entry.getKey().destroy();
-            }
-            result.add(combineTradingStatements(currentSeriesResult, strats.getValue()));
-            if (counter % 1000 == 0) {
-                System.gc();
-            }
-        }
-        return result;
-    }
-
-    private void printAndSaveResults(List<TradingStatement> result, String name) {
-        LOG.info("---Worst result:--- \n" + printReport(result.subList(0, 1)) + "\n-------------");
+    private void printAndSaveResults(List<TradingStatement> result, String name, BigDecimal percentageUpperBound) {
+        LOG.info("---Worst result:--- \n" + printReport(result.subList(0, Math.min(1, result.size()))) + "\n-------------");
         LOG.info("---best results:--- \n" + printReport(result.subList(Math.max(result.size() - 10, 0), result.size())) + "\n-------------");
-        store(result, name + System.currentTimeMillis() + "_steps_" + upPercentage + "_maxLookback_" + lookback_max);
+        String suffix = name + System.currentTimeMillis() + "_steps_" + upPercentage + "_maxLookback_" + lookback_max;
+        if (percentageUpperBound != null) {
+            suffix += "_maxPercentage_" + DECIMAL_FORMAT.format(percentageUpperBound);
+        }
+        store(result, suffix);
     }
 
     private void sortResultsByProfit(List<TradingStatement> result) {
