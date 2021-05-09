@@ -39,6 +39,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.function.Function;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -103,20 +104,17 @@ public class IntelligentTa4jBenchmarks {
         buyFeeFactor = BigDecimal.ONE.add(buyFee);
         sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
 
-        upPercentage = 1.309;
-        lookback_max = 500;
+        upPercentage = 10;
+        //upPercentage = 1.309;
+        lookback_max = 10;
+        //lookback_max = 500;
+
     }
 
     @Test
     public void testMineTripleKeltnerTrailingTa4j() {
-        Queue<Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String>> strategies = new LinkedList<>();
-
-        for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
-            for (long j = 1; j < lookback_max; j = Math.round(Math.ceil(j * upPercentage))) {
-                String currentStrategyName = "i(" + i + "), j(" + j + ")";
-                LOG.info(currentStrategyName);
-                List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>> strategiesForTheSeries = new LinkedList<>();
-                for (BarSeries series : allSeries) {
+        runBenchmarkForTwoVariables("Ta4jKeltnerTriple",
+                i -> j -> currentStrategyName -> series -> {
                     ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
                     LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
                     HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
@@ -135,27 +133,15 @@ public class IntelligentTa4jBenchmarks {
                     IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
                     Rule exitRule = new UnderIndicatorRule(bidPriceIndicator, intelligentTrailIndicator);
 
-                    strategiesForTheSeries.add(new AbstractMap.SimpleEntry<>(new AbstractMap.SimpleEntry<>(new BaseStrategy(series.getName() + "_" + currentStrategyName, entryRule, exitRule), series), breakEvenIndicator));
+                    return new AbstractMap.SimpleEntry<>(new AbstractMap.SimpleEntry<>(new BaseStrategy(series.getName() + "_" + currentStrategyName, entryRule, exitRule), series), breakEvenIndicator);
                 }
-                strategies.offer(new AbstractMap.SimpleEntry<>(strategiesForTheSeries, currentStrategyName));
-            }
-        }
-
-        List<TradingStatement> result = simulateStrategiesWithBreakEvenIndicator(strategies);
-        sortResultsByProfit(result);
-        printAndSaveResults(result, "_Ta4jKeltnerTriple_");
+        );
     }
-
 
     @Test
     public void testMineKeltnerTrailingTa4j() {
-        Queue<Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String>> strategies = new LinkedList<>();
-        for (long i = 9; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
-            for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
-                String currentStrategyName = "i(" + i + "), j(" + j + ")";
-                LOG.info(currentStrategyName);
-                List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>> strategiesForTheSeries = new LinkedList<>();
-                for (BarSeries series : allSeries) {
+        runBenchmarkForTwoVariables("Ta4jKeltner",
+                i -> j -> currentStrategyName -> series -> {
                     ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
                     LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
                     HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
@@ -173,24 +159,14 @@ public class IntelligentTa4jBenchmarks {
 
                     IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
                     UnderIndicatorRule exitRule = new UnderIndicatorRule(bidPriceIndicator, intelligentTrailIndicator);
-
-                    strategiesForTheSeries.add(new AbstractMap.SimpleEntry<>(new AbstractMap.SimpleEntry<>(new BaseStrategy(currentStrategyName, entryRule, exitRule), series), breakEvenIndicator));
+                    return new AbstractMap.SimpleEntry<>(new AbstractMap.SimpleEntry<>(new BaseStrategy(currentStrategyName, entryRule, exitRule), series), breakEvenIndicator);
                 }
-                strategies.offer(new AbstractMap.SimpleEntry<>(strategiesForTheSeries, currentStrategyName));
-            }
-
-        }
-
-        List<TradingStatement> result = simulateStrategiesWithBreakEvenIndicator(strategies);
-        sortResultsByProfit(result);
-        printAndSaveResults(result, "_Ta4jKeltner_");
+        );
     }
 
-    @Test
+    /*@Test
     public void testMineTa4j() {
         Queue<Map.Entry<List<Map.Entry<Strategy, BarSeries>>, String>> strategies = new LinkedList<>();
-
-
         for (long i = 26; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 9; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
                 for (long k = 26; k < lookback_max; k = Math.round(Math.ceil(k * upPercentage))) {
@@ -215,10 +191,14 @@ public class IntelligentTa4jBenchmarks {
                             TransformIndicator sellIndicatorShort = TransformIndicator.multiply(new EMAIndicator(askPriceIndicator, Math.toIntExact(l)), buyFeeFactor);
 
                             Rule entryRule = new CrossedUpIndicatorRule(buyIndicatorShort, buyIndicatorLong) // Trend
-                                    /*.and(new UnderIndicatorRule(stochasticOscillaltorK, 20)) // Signal 1*/;/*.and(new OverIndicatorRule(macd, emaMacd)); // Signal 2*/
+                                    //.and(new UnderIndicatorRule(stochasticOscillaltorK, 20)) // Signal 1
+                                    //.and(new OverIndicatorRule(macd, emaMacd)); // Signal 2
+                                    ;
 
                             Rule exitRule = new CrossedDownIndicatorRule(sellIndicatorShort, sellIndicatorLong) // Trend
-                                    /*.and(new OverIndicatorRule(stochasticOscillaltorK, 80)) // Signal 1*/;/*.and(new UnderIndicatorRule(macd, emaMacd)); // Signal 2*/
+                                    //.and(new OverIndicatorRule(stochasticOscillaltorK, 80)) // Signal 1
+                                    //.and(new UnderIndicatorRule(macd, emaMacd)); // Signal 2
+                                    ;
                             strategiesForTheSeries.add(new AbstractMap.SimpleEntry<>(new BaseStrategy(currentStrategyName, entryRule, exitRule), series));
                         }
                         strategies.offer(new AbstractMap.SimpleEntry<>(strategiesForTheSeries, currentStrategyName));
@@ -308,6 +288,27 @@ public class IntelligentTa4jBenchmarks {
         LOG.info(printReport(result.subList(0, 1)));
         LOG.info(printReport(result.subList(result.size() - 10, result.size())));
         store(result, "_Ta4jTrailing_" + System.currentTimeMillis() + "_steps_" + upPercentage + "_maxLookback_" + lookback_max + "_maxPercentage_" + DECIMAL_FORMAT.format(percentageUpperBound));
+    }*/
+
+    private void runBenchmarkForTwoVariables(String benchmarkName, Function<Integer, Function<Integer, Function<String, Function<BarSeries, Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>>>> strategyCreator) {
+        Queue<Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String>> strategies = new LinkedList<>();
+
+        for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
+            for (long j = 1; j < lookback_max; j = Math.round(Math.ceil(j * upPercentage))) {
+                String currentStrategyName = "i(" + i + "), j(" + j + ")";
+                LOG.info(currentStrategyName);
+                List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>> strategiesForTheSeries = new LinkedList<>();
+                for (BarSeries series : allSeries) {
+                    Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator> createdStrategyWithBreakEven = strategyCreator.apply(Math.toIntExact(i)).apply(Math.toIntExact(j)).apply(currentStrategyName).apply(series);
+                    strategiesForTheSeries.add(createdStrategyWithBreakEven);
+                }
+                strategies.offer(new AbstractMap.SimpleEntry<>(strategiesForTheSeries, currentStrategyName));
+            }
+        }
+
+        List<TradingStatement> result = simulateStrategiesWithBreakEvenIndicator(strategies);
+        sortResultsByProfit(result);
+        printAndSaveResults(result, "_" + benchmarkName + "_");
     }
 
     private List<TradingStatement> simulateStrategiesWithBreakEvenIndicator(Queue<Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String>> strategies) {
@@ -364,7 +365,7 @@ public class IntelligentTa4jBenchmarks {
 
     private void printAndSaveResults(List<TradingStatement> result, String name) {
         LOG.info("---Worst result:--- \n" + printReport(result.subList(0, 1)) + "\n-------------");
-        LOG.info("---best results:--- \n" + printReport(result.subList(result.size() - 10, result.size())) + "\n-------------");
+        LOG.info("---best results:--- \n" + printReport(result.subList(Math.max(result.size() - 10, 0), result.size())) + "\n-------------");
         store(result, name + System.currentTimeMillis() + "_steps_" + upPercentage + "_maxLookback_" + lookback_max);
     }
 
