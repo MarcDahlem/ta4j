@@ -43,7 +43,9 @@ import org.ta4j.core.reports.TradingStatement;
 import org.ta4j.core.rules.*;
 import ta4jexamples.loaders.JsonBarsSerializer;
 
+import java.io.File;
 import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
@@ -69,14 +71,14 @@ public class MovingMomentumStrategyTest {
         BigDecimal buyFeeFactor = BigDecimal.ONE.add(buyFee);
         BigDecimal sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
 
-        double upPercentage = 1.1545;
+        double upPercentage = 1.309;
         int lookback_max = 500;
 
         Queue<Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String>> strategies = new LinkedList<>();
 
 
-        for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
-            for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
+        for (long i = 9; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
+            for (long j = 9; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
                         String currentStrategyName = "i(" + i + "), j(" + j + ")";
                         LOG.info(currentStrategyName);
                         List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>> strategiesForTheSeries = new LinkedList<>();
@@ -86,10 +88,10 @@ public class MovingMomentumStrategyTest {
                             HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
                             int keltnerBarCount = Math.toIntExact(i);
                             int keltnerRatio = Math.toIntExact(j);
-                            KeltnerChannelMiddleIndicator buyLongIndicator = new KeltnerChannelMiddleIndicator(askPriceIndicator, keltnerBarCount);
-                            KeltnerChannelLowerIndicator buyGainLine = new KeltnerChannelLowerIndicator((KeltnerChannelMiddleIndicator) buyLongIndicator, keltnerRatio, keltnerBarCount);
+                            KeltnerChannelMiddleIndicator keltnerMidAsk = new KeltnerChannelMiddleIndicator(askPriceIndicator, keltnerBarCount);
+                            KeltnerChannelLowerIndicator keltnerLow = new KeltnerChannelLowerIndicator(keltnerMidAsk, keltnerRatio, keltnerBarCount);
 
-                            Rule entryRule = new CrossedDownIndicatorRule(askPriceIndicator, buyGainLine);
+                            Rule entryRule = new UnderIndicatorRule(askPriceIndicator, keltnerLow);
 
                             SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
                             Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
@@ -124,7 +126,7 @@ public class MovingMomentumStrategyTest {
                 entry.getKey().getKey().destroy();
             }
             result.add(combineTradingStatements(currentSeriesResult, strats.getValue()));
-            if (counter % 1000 == 0) {
+            if (counter % 2 == 0) {
                 System.gc();
             }
         }
@@ -275,16 +277,26 @@ public class MovingMomentumStrategyTest {
     }
 
     private Set<BarSeries> loadSeries() {
+        List<String> folders = new LinkedList<>();
+        folders.add("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\");
+        folders.add("D:\\Documents\\Programmierung\\bxbot\\recordedMarketData\\");
+
         Set<BarSeries> result = new HashSet<>();
-        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\barData_1618580976288.json"));
-        result.add(JsonBarsSerializer.loadSeries("D:\\Documents\\Programmierung\\bxbot\\recordedMarketData\\barData_1618533095982.json"));
-        result.add(JsonBarsSerializer.loadSeries("D:\\Documents\\Programmierung\\bxbot\\recordedMarketData\\barData_1618527900760.json"));
-        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\XRPEUR1619755007893.json"));
-        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\XRPEUR1619776350101.json"));
-        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\XRPEUR1619822902408.json"));
-        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\XRPEUR1619898650211.json"));
-        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\XRPEUR1619943515150.json"));
-        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\XRPEUR1620317267197.json"));
+        for (String folder: folders) {
+            File f = new File(folder);
+
+            FilenameFilter filter = new FilenameFilter() {
+                @Override
+                public boolean accept(File f, String name) {
+                    return name.toLowerCase(Locale.ROOT).endsWith(".json");
+                }
+            };
+
+            String[] pathnames = f.list(filter);
+            for (String path: pathnames) {
+                result.add(JsonBarsSerializer.loadSeries(folder + File.separator + path));
+            }
+        }
         return result;
 
     }
