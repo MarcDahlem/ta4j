@@ -32,6 +32,9 @@ import org.ta4j.core.cost.LinearTransactionCostModel;
 import org.ta4j.core.cost.ZeroCostModel;
 import org.ta4j.core.indicators.*;
 import org.ta4j.core.indicators.helpers.*;
+import org.ta4j.core.indicators.keltner.KeltnerChannelLowerIndicator;
+import org.ta4j.core.indicators.keltner.KeltnerChannelMiddleIndicator;
+import org.ta4j.core.indicators.keltner.KeltnerChannelUpperIndicator;
 import org.ta4j.core.num.DecimalNum;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.reports.PerformanceReport;
@@ -55,6 +58,97 @@ public class MovingMomentumStrategyTest {
     @Test
     public void test() {
         MovingMomentumStrategy.main(null);
+    }
+
+    @Test
+    public void testMineKeltnerTrailingTa4j() {
+        Set<BarSeries> allSeries = loadSeries();
+
+        BigDecimal buyFee = new BigDecimal("0.0026");
+        BigDecimal sellFee = new BigDecimal("0.0026");
+        BigDecimal buyFeeFactor = BigDecimal.ONE.add(buyFee);
+        BigDecimal sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
+
+        double upPercentage = 1.1545;
+        int lookback_max = 500;
+
+        Queue<Map.Entry<List<Map.Entry<Strategy, BarSeries>>, String>> strategies = new LinkedList<>();
+
+
+        for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
+            for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
+                        String currentStrategyName = "i(" + i + "), j(" + j + ")";
+                        LOG.info(currentStrategyName);
+                        List<Map.Entry<Strategy, BarSeries>> strategiesForTheSeries = new LinkedList<>();
+                        for (BarSeries series : allSeries) {
+                            ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
+                            LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
+                            HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
+                            int keltnerBarCount = Math.toIntExact(i);
+                            int keltnerRatio = Math.toIntExact(j);
+                            KeltnerChannelMiddleIndicator buyLongIndicator = new KeltnerChannelMiddleIndicator(askPriceIndicator, keltnerBarCount);
+                            KeltnerChannelLowerIndicator buyGainLine = new KeltnerChannelLowerIndicator((KeltnerChannelMiddleIndicator) buyLongIndicator, keltnerRatio, keltnerBarCount);
+
+                            Rule entryRule = new CrossedDownIndicatorRule(askPriceIndicator, buyGainLine);
+
+                            SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                            Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
+                            Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.02"), breakEvenIndicator);
+                            Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
+
+                            IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
+                            UnderIndicatorRule exitRule = new UnderIndicatorRule(bidPriceIndicator, intelligentTrailIndicator);
+
+                            strategiesForTheSeries.add(new AbstractMap.SimpleEntry<>(new BaseStrategy(currentStrategyName, entryRule, exitRule), series));
+                        }
+                        strategies.offer(new AbstractMap.SimpleEntry<>(strategiesForTheSeries, currentStrategyName));
+                    }
+
+        }
+
+        List<TradingStatement> result = new LinkedList<>();
+        int counter = 0;
+        int originalSize = strategies.size();
+        while (strategies.size() > 0) {
+            counter++;
+            LOG.info("Executing ta4j keltner strategies " + counter + "/" + originalSize);
+
+            Map.Entry<List<Map.Entry<Strategy, BarSeries>>, String> strats = strategies.poll();
+            List<TradingStatement> currentSeriesResult = new LinkedList<>();
+            for (Map.Entry<Strategy, BarSeries> entry : strats.getKey()) {
+                BacktestExecutor bte = new BacktestExecutor(entry.getValue(), new LinearTransactionCostModel(0.0026), new ZeroCostModel());
+                List<Strategy> toBeExecuted = new LinkedList<>();
+                toBeExecuted.add(entry.getKey());
+                currentSeriesResult.addAll(bte.execute(toBeExecuted, entry.getValue().numOf(25), Trade.TradeType.BUY));
+
+                entry.getKey().destroy();
+            }
+            result.add(combineTradingStatements(currentSeriesResult, strats.getValue()));
+            if (counter % 1000 == 0) {
+                System.gc();
+            }
+        }
+
+        result.sort((o1, o2) -> {
+            Num trades1 = o1.getPositionStatsReport().getLossCount().plus(o1.getPositionStatsReport().getProfitCount()).plus(o1.getPositionStatsReport().getBreakEvenCount());
+            Num trades2 = o2.getPositionStatsReport().getLossCount().plus(o2.getPositionStatsReport().getProfitCount()).plus(o2.getPositionStatsReport().getBreakEvenCount());
+
+            if (trades1.isLessThanOrEqual(trades1.numOf(1))) {
+                if (trades2.isLessThanOrEqual(trades1.numOf(1))) {
+                    return 0;
+                } else {
+                    return -1;
+                }
+            }
+            if (trades2.isLessThanOrEqual(trades1.numOf(1))) {
+                return 1;
+            }
+
+            return o1.getPerformanceReport().getTotalProfitLoss().compareTo(o2.getPerformanceReport().getTotalProfitLoss());
+        });
+        LOG.info("---Worst result:--- \n" + printReport(result.subList(0, 1)) + "\n-------------");
+        LOG.info("---best results:--- \n" + printReport(result.subList(result.size() - 10, result.size())) + "\n-------------");
+        store(result, "_Ta4jKeltner_" + System.currentTimeMillis() + "_steps_" + upPercentage + "_maxLookback_" + lookback_max);
     }
 
     @Test
@@ -182,15 +276,15 @@ public class MovingMomentumStrategyTest {
 
     private Set<BarSeries> loadSeries() {
         Set<BarSeries> result = new HashSet<>();
-        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\barData_1618580976288.json"));
-        result.add(JsonBarsSerializer.loadSeries("D:\\Documents\\Programmierung\\bxbot\\barData_1618533095982.json"));
-        result.add(JsonBarsSerializer.loadSeries("D:\\Documents\\Programmierung\\bxbot\\barData_1618527900760.json"));
-        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\XRPEUR1619755007893.json"));
-        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\XRPEUR1619776350101.json"));
-        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\XRPEUR1619822902408.json"));
-        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\XRPEUR1619898650211.json"));
-        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\XRPEUR1619943515150.json"));
-        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\XRPEUR1620317267197.json"));
+        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\barData_1618580976288.json"));
+        result.add(JsonBarsSerializer.loadSeries("D:\\Documents\\Programmierung\\bxbot\\recordedMarketData\\barData_1618533095982.json"));
+        result.add(JsonBarsSerializer.loadSeries("D:\\Documents\\Programmierung\\bxbot\\recordedMarketData\\barData_1618527900760.json"));
+        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\XRPEUR1619755007893.json"));
+        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\XRPEUR1619776350101.json"));
+        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\XRPEUR1619822902408.json"));
+        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\XRPEUR1619898650211.json"));
+        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\XRPEUR1619943515150.json"));
+        result.add(JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\XRPEUR1620317267197.json"));
         return result;
 
     }
