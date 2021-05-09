@@ -165,52 +165,34 @@ public class IntelligentTa4jBenchmarks {
 
     @Test
     public void testMineTa4j() {
-        // TODO rework
-        Queue<StrategyBenchmarkConfiguration> strategies = new LinkedList<>();
-        for (long i = 26; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
-            for (long j = 9; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
-                for (long k = 26; k < lookback_max; k = Math.round(Math.ceil(k * upPercentage))) {
-                    for (long l = 9; l < k; l = Math.round(Math.ceil(l * upPercentage))) {
-                        String currentStrategyName = "i(" + i + "), j(" + j + "), k(" + k + "),l(" + l + ")";
-                        LOG.info(currentStrategyName);
-                        List<StrategyConfiguration> strategiesForTheSeries = new LinkedList<>();
-                        for (BarSeries series : allSeries) {
-                            ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
-                            LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
-                            HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
+        runBenchmarkForFourVariables("Ta4jMacd",
+                i -> j -> k -> l -> series -> {
+                    ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
+                    LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
+                    HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
 
-                            //StochasticOscillatorKIndicator stochasticOscillaltorK = new StochasticOscillatorKIndicator(series, 140);
-                            //MACDIndicator macd = new MACDIndicator(closePriceIndicator, 90, 260);
-                            //EMAIndicator emaMacd = new EMAIndicator(macd, 180);
+                    //StochasticOscillatorKIndicator stochasticOscillaltorK = new StochasticOscillatorKIndicator(series, 140);
+                    //MACDIndicator macd = new MACDIndicator(closePriceIndicator, 90, 260);
+                    //EMAIndicator emaMacd = new EMAIndicator(macd, 180);
 
 
-                            EMAIndicator buyIndicatorLong = new EMAIndicator(bidPriceIndicator, Math.toIntExact(i));
-                            TransformIndicator buyIndicatorShort = TransformIndicator.multiply(new EMAIndicator(bidPriceIndicator, Math.toIntExact(j)), sellFeeFactor);
+                    EMAIndicator buyIndicatorLong = new EMAIndicator(bidPriceIndicator, Math.toIntExact(i));
+                    TransformIndicator buyIndicatorShort = TransformIndicator.multiply(new EMAIndicator(bidPriceIndicator, Math.toIntExact(j)), sellFeeFactor);
 
-                            EMAIndicator sellIndicatorLong = new EMAIndicator(askPriceIndicator, Math.toIntExact(k));
-                            TransformIndicator sellIndicatorShort = TransformIndicator.multiply(new EMAIndicator(askPriceIndicator, Math.toIntExact(l)), buyFeeFactor);
+                    EMAIndicator sellIndicatorLong = new EMAIndicator(askPriceIndicator, Math.toIntExact(k));
+                    TransformIndicator sellIndicatorShort = TransformIndicator.multiply(new EMAIndicator(askPriceIndicator, Math.toIntExact(l)), buyFeeFactor);
 
-                            Rule entryRule = new CrossedUpIndicatorRule(buyIndicatorShort, buyIndicatorLong) // Trend
-                                    //.and(new UnderIndicatorRule(stochasticOscillaltorK, 20)) // Signal 1
-                                    //.and(new OverIndicatorRule(macd, emaMacd)); // Signal 2
-                                    ;
+                    Rule entryRule = new CrossedUpIndicatorRule(buyIndicatorShort, buyIndicatorLong) // Trend
+                            //.and(new UnderIndicatorRule(stochasticOscillaltorK, 20)) // Signal 1
+                            //.and(new OverIndicatorRule(macd, emaMacd)); // Signal 2
+                            ;
 
-                            Rule exitRule = new CrossedDownIndicatorRule(sellIndicatorShort, sellIndicatorLong) // Trend
-                                    //.and(new OverIndicatorRule(stochasticOscillaltorK, 80)) // Signal 1
-                                    //.and(new UnderIndicatorRule(macd, emaMacd)); // Signal 2
-                                    ;
-                            strategiesForTheSeries.add(new StrategyConfiguration(new BaseStrategy(currentStrategyName, entryRule, exitRule), series, null));
-                        }
-                        strategies.offer(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
-                    }
-                }
-            }
-
-        }
-
-        List<TradingStatement> result = simulateStrategies(strategies);
-        sortResultsByProfit(result);
-        printAndSaveResults(result, "_Ta4jMacd_", null);
+                    Rule exitRule = new CrossedDownIndicatorRule(sellIndicatorShort, sellIndicatorLong) // Trend
+                            //.and(new OverIndicatorRule(stochasticOscillaltorK, 80)) // Signal 1
+                            //.and(new UnderIndicatorRule(macd, emaMacd)); // Signal 2
+                            ;
+                    return new StrategyCreationResult(entryRule, exitRule, null);
+                });
     }
 
     @Test
@@ -300,6 +282,39 @@ public class IntelligentTa4jBenchmarks {
                     strategiesForTheSeries.add(new StrategyConfiguration(strategy, series, creationResult.getBreakEvenIndicator()));
                 }
                 strategies.offer(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
+            }
+        }
+
+        List<TradingStatement> result = simulateStrategies(strategies);
+        sortResultsByProfit(result);
+        printAndSaveResults(result, "_" + benchmarkName + "_", null);
+    }
+
+    private void runBenchmarkForFourVariables(
+            String benchmarkName,
+            Function<Integer, Function<Integer, Function<Integer, Function<Integer, Function<BarSeries, StrategyCreationResult>>>>> strategyCreator
+    ) {
+        Queue<StrategyBenchmarkConfiguration> strategies = new LinkedList<>();
+
+        for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
+            for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
+                for (long k = 26; k < lookback_max; k = Math.round(Math.ceil(k * upPercentage))) {
+                    for (long l = 9; l < k; l = Math.round(Math.ceil(l * upPercentage))) {
+                        String currentStrategyName = "i(" + i + "), j(" + j + "), k(" + k + "),l(" + l + ")";
+                        LOG.info(currentStrategyName);
+                        List<StrategyConfiguration> strategiesForTheSeries = new LinkedList<>();
+                        for (BarSeries series : allSeries) {
+                            StrategyCreationResult creationResult = strategyCreator.apply(Math.toIntExact(i))
+                                    .apply(Math.toIntExact(j))
+                                    .apply(Math.toIntExact(k))
+                                    .apply(Math.toIntExact(l))
+                                    .apply(series);
+                            BaseStrategy strategy = new BaseStrategy(series.getName() + "_" + currentStrategyName, creationResult.getEntryRule(), creationResult.getExitRule());
+                            strategiesForTheSeries.add(new StrategyConfiguration(strategy, series, creationResult.getBreakEvenIndicator()));
+                        }
+                        strategies.offer(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
+                    }
+                }
             }
         }
 
@@ -471,7 +486,8 @@ public class IntelligentTa4jBenchmarks {
         FileWriter writer = null;
         try {
 
-            if (false) throw new IOException("never thrown"); else LOG.debug("Gson writing disabled");
+            if (false) throw new IOException("never thrown");
+            else LOG.debug("Gson writing disabled");
             //writer = new FileWriter("Benchmarks_" + suffix + ".json");
             //gson.toJson(results, writer);
         } catch (IOException e) {
@@ -500,9 +516,13 @@ public class IntelligentTa4jBenchmarks {
             this.breakEvenIndicator = breakEvenIndicator;
         }
 
-        Rule getEntryRule() {return entryRule;}
+        Rule getEntryRule() {
+            return entryRule;
+        }
 
-        Rule getExitRule() {return exitRule;}
+        Rule getExitRule() {
+            return exitRule;
+        }
 
         SellIndicator getBreakEvenIndicator() {
             return breakEvenIndicator;
