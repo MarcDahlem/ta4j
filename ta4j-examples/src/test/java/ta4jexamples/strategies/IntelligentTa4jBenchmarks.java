@@ -74,6 +74,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSerializer;
 
+import ch.qos.logback.classic.spi.IThrowableProxy;
 import ta4jexamples.loaders.JsonBarsSerializer;
 
 public class IntelligentTa4jBenchmarks {
@@ -286,7 +287,7 @@ public class IntelligentTa4jBenchmarks {
             String benchmarkName,
             Function<Integer, Function<Integer, Function<BarSeries, StrategyCreationResult>>> strategyCreator
     ) {
-        Queue<Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String>> strategies = new LinkedList<>();
+        Queue<StrategyBenchmarkConfiguration> strategies = new LinkedList<>();
 
         for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 1; j < lookback_max; j = Math.round(Math.ceil(j * upPercentage))) {
@@ -299,7 +300,7 @@ public class IntelligentTa4jBenchmarks {
                     Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator> createdStrategyWithBreakEven = new AbstractMap.SimpleEntry<>(new AbstractMap.SimpleEntry<>(strategy, series), creationResult.getBreakEvenIndicator());
                     strategiesForTheSeries.add(createdStrategyWithBreakEven);
                 }
-                strategies.offer(new AbstractMap.SimpleEntry<>(strategiesForTheSeries, currentStrategyName));
+                strategies.offer(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
             }
         }
 
@@ -308,17 +309,22 @@ public class IntelligentTa4jBenchmarks {
         printAndSaveResults(result, "_" + benchmarkName + "_");
     }
 
-    private List<TradingStatement> simulateStrategiesWithBreakEvenIndicator(Queue<Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String>> strategies) {
+    private List<TradingStatement> simulateStrategiesWithBreakEvenIndicator(Queue<StrategyBenchmarkConfiguration> benchmarkConfigurations) {
         List<TradingStatement> result = new LinkedList<>();
         int counter = 0;
-        int originalSize = strategies.size();
-        while (strategies.size() > 0) {
+        int originalSize = benchmarkConfigurations.size();
+        while (benchmarkConfigurations.size() > 0) {
             counter++;
-            LOG.info("Executing ta4j strategies " + counter + "/" + originalSize);
+            LOG.info("Executing ta4j configurations " + counter + "/" + originalSize);
 
-            Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String> strats = strategies.poll();
+            StrategyBenchmarkConfiguration strats = benchmarkConfigurations.poll();
             List<TradingStatement> currentSeriesResult = new LinkedList<>();
-            for (Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator> entry : strats.getKey()) {
+
+            int amountStrategies = strats.list.size();
+            int strategyCounter = 0;
+            for (Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator> entry : strats.list) {
+                strategyCounter++;
+                LOG.info("  * Simulating strategy " + strategyCounter + "/" + amountStrategies);
                 BacktestExecutor bte = new BacktestExecutor(entry.getKey().getValue(), new LinearTransactionCostModel(0.0026), new ZeroCostModel());
                 Map<Strategy, SellIndicator> toBeExecuted = new HashMap<>();
                 toBeExecuted.put(entry.getKey().getKey(), entry.getValue());
@@ -326,7 +332,7 @@ public class IntelligentTa4jBenchmarks {
 
                 entry.getKey().getKey().destroy();
             }
-            result.add(combineTradingStatements(currentSeriesResult, strats.getValue()));
+            result.add(combineTradingStatements(currentSeriesResult, strats.name));
             if (counter % 2 == 0) {
                 System.gc();
             }
@@ -489,9 +495,9 @@ public class IntelligentTa4jBenchmarks {
         FileWriter writer = null;
         try {
 
-
-            writer = new FileWriter("Benchmarks_" + suffix + ".json");
-            gson.toJson(results, writer);
+            if (false) throw new IOException("never thrown"); else LOG.debug("Gson writing disabled");
+            //writer = new FileWriter("Benchmarks_" + suffix + ".json");
+            //gson.toJson(results, writer);
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
@@ -527,4 +533,13 @@ public class IntelligentTa4jBenchmarks {
         }
     }
 
+    private static class StrategyBenchmarkConfiguration {
+        final List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>> list;
+        final String name;
+
+        public StrategyBenchmarkConfiguration(List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>> strategiesForTheSeries, String currentStrategyName) {
+            list = strategiesForTheSeries;
+            name = currentStrategyName;
+        }
+    }
 }
