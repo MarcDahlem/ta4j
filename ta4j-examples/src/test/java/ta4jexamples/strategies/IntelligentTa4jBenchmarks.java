@@ -29,7 +29,6 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
-import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -93,6 +92,8 @@ public class IntelligentTa4jBenchmarks {
     private int lookback_max;
     private BigDecimal buyFeeFactor;
     private BigDecimal sellFeeFactor;
+    private BigDecimal upPercentageBig;
+    private BigDecimal percentageUpperBound;
 
     @Before
     public void setupTests() {
@@ -105,8 +106,13 @@ public class IntelligentTa4jBenchmarks {
 
         upPercentage = 10;
         //upPercentage = 1.309;
-        lookback_max = 10;
+        lookback_max = 11;
         //lookback_max = 500;
+
+        upPercentageBig = new BigDecimal(upPercentage);
+
+        percentageUpperBound = new BigDecimal("0.001");
+        percentageUpperBound = new BigDecimal("0.1");
 
     }
 
@@ -197,72 +203,29 @@ public class IntelligentTa4jBenchmarks {
 
     @Test
     public void testMineTa4jTrailing() {
-        // TODO rework
-        BarSeries series = JsonBarsSerializer.loadSeries("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\barData_1618580976288.json");
+        runBenchmarkForSixVariablesPercentage("Ta4jTrailing",
+                i -> j -> k -> below -> above -> minAbove -> series -> {
+                    ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
+                    LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
+                    HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
+                    LowestValueIndicator buyLongIndicator = new LowestValueIndicator(askPriceIndicator, Math.toIntExact(i));
+                    LowestValueIndicator buyShortIndicator = new LowestValueIndicator(askPriceIndicator, Math.toIntExact(j));
+                    TransformIndicator buyGainLine = TransformIndicator.multiply(buyLongIndicator, BigDecimal.ONE.add(k));
 
-        ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
-        LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
-        HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
 
-        Queue<Map.Entry<Strategy, SellIndicator>> strategies = new LinkedList<>();
-
-
-        BigDecimal upPercentageBig = new BigDecimal(upPercentage);
-
-        BigDecimal percentageUpperBound = new BigDecimal("0.1");
-
-        for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) { // lookback long
-            for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) { //lookback short
-                for (BigDecimal k = new BigDecimal("0.001"); k.compareTo(percentageUpperBound) <= 0; k = k.multiply(upPercentageBig)) { // buy up percentage needed
-                    for (BigDecimal below = new BigDecimal("0.001"); below.compareTo(percentageUpperBound) <= 0; below = below.multiply(upPercentageBig)) {
-                        for (BigDecimal above = new BigDecimal("0.001"); above.compareTo(percentageUpperBound) <= 0; above = above.multiply(upPercentageBig)) {
-                            for (BigDecimal minAbove = new BigDecimal("0.001"); minAbove.compareTo(above) <= 0; minAbove = minAbove.multiply(upPercentageBig)) {
-                                String currentStrategyName = "i(" + i + "), j(" + j + "), k(" + DECIMAL_FORMAT.format(k) + "),below(" + DECIMAL_FORMAT.format(below) + "),above(" + DECIMAL_FORMAT.format(above) + "),minAbove(" + DECIMAL_FORMAT.format(minAbove) + ")";
-                                LOG.info(currentStrategyName);
-                                LowestValueIndicator buyLongIndicator = new LowestValueIndicator(askPriceIndicator, Math.toIntExact(i));
-                                LowestValueIndicator buyShortIndicator = new LowestValueIndicator(askPriceIndicator, Math.toIntExact(j));
-                                TransformIndicator buyGainLine = TransformIndicator.multiply(buyLongIndicator, BigDecimal.ONE.add(k));
-
-                                SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
-
-                                OverIndicatorRule entryRule = new OverIndicatorRule(buyShortIndicator, buyGainLine);
+                    OverIndicatorRule entryRule = new OverIndicatorRule(buyShortIndicator, buyGainLine);
 
 
-                                Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, below, breakEvenIndicator);
-                                Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, above, breakEvenIndicator);
-                                Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, minAbove, breakEvenIndicator);
+                    Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, below, breakEvenIndicator);
+                    Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, above, breakEvenIndicator);
+                    Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, minAbove, breakEvenIndicator);
 
-                                IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
-                                UnderIndicatorRule exitRule = new UnderIndicatorRule(bidPriceIndicator, intelligentTrailIndicator);
+                    IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
+                    UnderIndicatorRule exitRule = new UnderIndicatorRule(bidPriceIndicator, intelligentTrailIndicator);
 
-                                strategies.offer(new AbstractMap.SimpleEntry<>(new BaseStrategy(currentStrategyName, entryRule, exitRule), breakEvenIndicator));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-
-        BacktestExecutor bte = new BacktestExecutor(series, new LinearTransactionCostModel(0.0026), new ZeroCostModel());
-        List<TradingStatement> result = new LinkedList<>();
-        int counter = 0;
-        int originalSize = strategies.size();
-        while (strategies.size() > 0) {
-            Map.Entry<Strategy, SellIndicator> strat = strategies.poll();
-            counter++;
-            LOG.info("Executing ta4j-trailing strategy " + counter + "/" + originalSize);
-            Map<Strategy, SellIndicator> listToBeExecuted = new HashMap<>();
-            listToBeExecuted.put(strat.getKey(), strat.getValue());
-            result.addAll(bte.execute(listToBeExecuted, series.numOf(25), Trade.TradeType.BUY));
-            strat.getKey().destroy();
-            if (counter % 300 == 0) {
-                System.gc();
-            }
-        }
-
-        sortResultsByProfit(result);
-        printAndSaveResults(result, "_Ta4jTrailing_", percentageUpperBound);
+                    return new StrategyCreationResult(entryRule, exitRule, breakEvenIndicator);
+                });
     }
 
     private void runBenchmarkForTwoVariables(
@@ -313,6 +276,45 @@ public class IntelligentTa4jBenchmarks {
                             strategiesForTheSeries.add(new StrategyConfiguration(strategy, series, creationResult.getBreakEvenIndicator()));
                         }
                         strategies.offer(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
+                    }
+                }
+            }
+        }
+
+        List<TradingStatement> result = simulateStrategies(strategies);
+        sortResultsByProfit(result);
+        printAndSaveResults(result, "_" + benchmarkName + "_", null);
+    }
+
+    private void runBenchmarkForSixVariablesPercentage(
+            String benchmarkName,
+            Function<Integer, Function<Integer, Function<BigDecimal, Function<BigDecimal, Function<BigDecimal, Function<BigDecimal, Function<BarSeries, StrategyCreationResult>>>>>>> strategyCreator
+    ) {
+        Queue<StrategyBenchmarkConfiguration> strategies = new LinkedList<>();
+
+        for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
+            for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
+                for (BigDecimal k = new BigDecimal("0.001"); k.compareTo(percentageUpperBound) <= 0; k = k.multiply(upPercentageBig)) { // buy up percentage needed
+                    for (BigDecimal below = new BigDecimal("0.001"); below.compareTo(percentageUpperBound) <= 0; below = below.multiply(upPercentageBig)) {
+                        for (BigDecimal above = new BigDecimal("0.001"); above.compareTo(percentageUpperBound) <= 0; above = above.multiply(upPercentageBig)) {
+                            for (BigDecimal minAbove = new BigDecimal("0.001"); minAbove.compareTo(above) <= 0; minAbove = minAbove.multiply(upPercentageBig)) {
+                                String currentStrategyName = "i(" + i + "), j(" + j + "), k(" + DECIMAL_FORMAT.format(k) + "),below(" + DECIMAL_FORMAT.format(below) + "),above(" + DECIMAL_FORMAT.format(above) + "),minAbove(" + DECIMAL_FORMAT.format(minAbove) + ")";
+                                LOG.info(currentStrategyName);
+                                List<StrategyConfiguration> strategiesForTheSeries = new LinkedList<>();
+                                for (BarSeries series : allSeries) {
+                                    StrategyCreationResult creationResult = strategyCreator.apply(Math.toIntExact(i))
+                                            .apply(Math.toIntExact(j))
+                                            .apply(k)
+                                            .apply(below)
+                                            .apply(above)
+                                            .apply(minAbove)
+                                            .apply(series);
+                                    BaseStrategy strategy = new BaseStrategy(series.getName() + "_" + currentStrategyName, creationResult.getEntryRule(), creationResult.getExitRule());
+                                    strategiesForTheSeries.add(new StrategyConfiguration(strategy, series, creationResult.getBreakEvenIndicator()));
+                                }
+                                strategies.offer(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
+                            }
+                        }
                     }
                 }
             }
