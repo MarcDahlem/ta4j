@@ -72,14 +72,14 @@ public class MovingMomentumStrategyTest {
         double upPercentage = 1.1545;
         int lookback_max = 500;
 
-        Queue<Map.Entry<List<Map.Entry<Strategy, BarSeries>>, String>> strategies = new LinkedList<>();
+        Queue<Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String>> strategies = new LinkedList<>();
 
 
         for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
                         String currentStrategyName = "i(" + i + "), j(" + j + ")";
                         LOG.info(currentStrategyName);
-                        List<Map.Entry<Strategy, BarSeries>> strategiesForTheSeries = new LinkedList<>();
+                        List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>> strategiesForTheSeries = new LinkedList<>();
                         for (BarSeries series : allSeries) {
                             ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
                             LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
@@ -99,7 +99,7 @@ public class MovingMomentumStrategyTest {
                             IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
                             UnderIndicatorRule exitRule = new UnderIndicatorRule(bidPriceIndicator, intelligentTrailIndicator);
 
-                            strategiesForTheSeries.add(new AbstractMap.SimpleEntry<>(new BaseStrategy(currentStrategyName, entryRule, exitRule), series));
+                            strategiesForTheSeries.add(new AbstractMap.SimpleEntry<>(new AbstractMap.SimpleEntry<>(new BaseStrategy(currentStrategyName, entryRule, exitRule), series), breakEvenIndicator));
                         }
                         strategies.offer(new AbstractMap.SimpleEntry<>(strategiesForTheSeries, currentStrategyName));
                     }
@@ -113,15 +113,15 @@ public class MovingMomentumStrategyTest {
             counter++;
             LOG.info("Executing ta4j keltner strategies " + counter + "/" + originalSize);
 
-            Map.Entry<List<Map.Entry<Strategy, BarSeries>>, String> strats = strategies.poll();
+            Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String> strats = strategies.poll();
             List<TradingStatement> currentSeriesResult = new LinkedList<>();
-            for (Map.Entry<Strategy, BarSeries> entry : strats.getKey()) {
-                BacktestExecutor bte = new BacktestExecutor(entry.getValue(), new LinearTransactionCostModel(0.0026), new ZeroCostModel());
-                List<Strategy> toBeExecuted = new LinkedList<>();
-                toBeExecuted.add(entry.getKey());
+            for (Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator> entry : strats.getKey()) {
+                BacktestExecutor bte = new BacktestExecutor(entry.getKey().getValue(), new LinearTransactionCostModel(0.0026), new ZeroCostModel());
+                Map<Strategy, SellIndicator> toBeExecuted = new HashMap<>();
+                toBeExecuted.put(entry.getKey().getKey(), entry.getValue());
                 currentSeriesResult.addAll(bte.execute(toBeExecuted, entry.getValue().numOf(25), Trade.TradeType.BUY));
 
-                entry.getKey().destroy();
+                entry.getKey().getKey().destroy();
             }
             result.add(combineTradingStatements(currentSeriesResult, strats.getValue()));
             if (counter % 1000 == 0) {
