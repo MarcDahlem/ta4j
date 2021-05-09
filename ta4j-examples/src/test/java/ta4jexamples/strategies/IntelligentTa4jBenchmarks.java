@@ -334,7 +334,7 @@ public class IntelligentTa4jBenchmarks {
             LOG.info("Executing ta4j configurations " + counter + "/" + originalSize);
 
             StrategyBenchmarkConfiguration strats = benchmarkConfigurations.poll();
-            List<TradingStatement> currentSeriesResult = new LinkedList<>();
+            Map<TradingStatement, BarSeries> currentSeriesResult = new HashMap<>();
 
             int amountStrategies = strats.list.size();
             int strategyCounter = 0;
@@ -344,7 +344,11 @@ public class IntelligentTa4jBenchmarks {
                 BacktestExecutor bte = new BacktestExecutor(entry.series, new LinearTransactionCostModel(0.0026), new ZeroCostModel());
                 Map<Strategy, SellIndicator> toBeExecuted = new HashMap<>();
                 toBeExecuted.put(entry.strategy, entry.breakEvenIndicator);
-                currentSeriesResult.addAll(bte.execute(toBeExecuted, entry.series.numOf(25), Trade.TradeType.BUY));
+                List<TradingStatement> tradingStatement = bte.execute(toBeExecuted, entry.series.numOf(25), Trade.TradeType.BUY);
+                if (tradingStatement.size() != 1) {
+                    throw new IllegalStateException("Put only 1 Strategy. Why mutliple results?");
+                }
+                currentSeriesResult.put(tradingStatement.get(0), entry.series);
                 entry.strategy.destroy();
             }
             result.add(combineTradingStatements(currentSeriesResult, strats.name));
@@ -381,11 +385,11 @@ public class IntelligentTa4jBenchmarks {
                 return 1;
             }
 
-            return o1.getPerformanceReport().getTotalProfitLoss().compareTo(o2.getPerformanceReport().getTotalProfitLoss());
+            return o1.getPerformanceReport().getTotalProfitLossPercentage().compareTo(o2.getPerformanceReport().getTotalProfitLossPercentage());
         });
     }
 
-    private TradingStatement combineTradingStatements(List<TradingStatement> statements, String strategyName) {
+    private TradingStatement combineTradingStatements(Map<TradingStatement, BarSeries> statements, String strategyName) {
         Num totalProfitLoss = DecimalNum.valueOf(0);
         Num totalProfitLossPercentage = DecimalNum.valueOf(0);
         Num totalProfit = DecimalNum.valueOf(0);
@@ -394,8 +398,12 @@ public class IntelligentTa4jBenchmarks {
         Num profitCount = DecimalNum.valueOf(0);
         Num lossCount = DecimalNum.valueOf(0);
         Num breakEvenCount = DecimalNum.valueOf(0);
+        int currentTickSum = 0;
 
-        for (TradingStatement statement : statements) {
+        for (Map.Entry<TradingStatement, BarSeries> entry : statements.entrySet()) {
+            TradingStatement statement = entry.getKey();
+            BarSeries series = entry.getValue();
+
             totalProfitLoss = totalProfitLoss.plus(statement.getPerformanceReport().getTotalProfitLoss());
             totalProfit = totalProfit.plus(statement.getPerformanceReport().getTotalProfit());
             totalLoss = totalLoss.plus(statement.getPerformanceReport().getTotalLoss());
@@ -403,12 +411,27 @@ public class IntelligentTa4jBenchmarks {
             profitCount = profitCount.plus(statement.getPositionStatsReport().getProfitCount());
             lossCount = lossCount.plus(statement.getPositionStatsReport().getLossCount());
             breakEvenCount = breakEvenCount.plus(statement.getPositionStatsReport().getBreakEvenCount());
+
+            Num totalProfitLossPercentageNew = statement.getPerformanceReport().getTotalProfitLossPercentage();
+            totalProfitLossPercentage = combinePercentages(totalProfitLossPercentage, series.numOf(currentTickSum), totalProfitLossPercentageNew, series.numOf(series.getBarCount()));
+            currentTickSum += series.getBarCount();
         }
 
         PerformanceReport combinedPerformceReport = new PerformanceReport(totalProfitLoss, totalProfitLossPercentage, totalProfit, totalLoss);
         PositionStatsReport combinedPositionReport = new PositionStatsReport(profitCount, lossCount, breakEvenCount);
 
         return new TradingStatement(new BaseStrategy(strategyName, new FixedRule(), new FixedRule()), combinedPositionReport, combinedPerformceReport);
+    }
+
+    private Num combinePercentages(Num totalProfitLossPercentage, Num currentTickSum, Num totalProfitLossPercentageNew, Num newTickSum) {
+        Num sumOfAllTicks = currentTickSum.plus(newTickSum);
+
+        Num currentWeight = currentTickSum.dividedBy (sumOfAllTicks);
+        Num newWeight = newTickSum.dividedBy(sumOfAllTicks);
+
+        Num weightedNewValue = totalProfitLossPercentageNew.multipliedBy(newWeight);
+        Num weightedOldValue = totalProfitLossPercentage.multipliedBy(currentWeight);
+        return weightedOldValue.plus(weightedNewValue);
     }
 
     private Set<BarSeries> loadSeries() {
@@ -488,10 +511,10 @@ public class IntelligentTa4jBenchmarks {
         FileWriter writer = null;
         try {
 
-            if (false) throw new IOException("never thrown");
-            else LOG.debug("Gson writing disabled");
-            //writer = new FileWriter("Benchmarks_" + suffix + ".json");
-            //gson.toJson(results, writer);
+            //if (false) throw new IOException("never thrown");
+            //else LOG.debug("Gson writing disabled");
+            writer = new FileWriter("Benchmarks_" + suffix + ".json");
+            gson.toJson(results, writer);
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
