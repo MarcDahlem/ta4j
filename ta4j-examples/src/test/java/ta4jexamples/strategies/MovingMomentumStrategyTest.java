@@ -24,6 +24,8 @@
 package ta4jexamples.strategies;
 
 import com.google.gson.*;
+
+import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +57,13 @@ import java.util.*;
 public class MovingMomentumStrategyTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(MovingMomentumStrategyTest.class);
+    private Set<BarSeries> allSeries;
+    private BigDecimal buyFee;
+    private BigDecimal sellFee;
+    private double upPercentage;
+    private int lookback_max;
+    private BigDecimal buyFeeFactor;
+    private BigDecimal sellFeeFactor;
 
 
     @Test
@@ -62,20 +71,22 @@ public class MovingMomentumStrategyTest {
         MovingMomentumStrategy.main(null);
     }
 
+    @Before
+    public void setupTests() {
+        allSeries = loadSeries();
+
+        buyFee = new BigDecimal("0.0026");
+        sellFee = new BigDecimal("0.0026");
+        buyFeeFactor = BigDecimal.ONE.add(buyFee);
+        sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
+
+        upPercentage = 1.309;
+        lookback_max = 500;
+    }
+
     @Test
     public void testMineTripleKeltnerTrailingTa4j() {
-        Set<BarSeries> allSeries = loadSeries();
-
-        BigDecimal buyFee = new BigDecimal("0.0026");
-        BigDecimal sellFee = new BigDecimal("0.0026");
-        BigDecimal buyFeeFactor = BigDecimal.ONE.add(buyFee);
-        BigDecimal sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
-
-        double upPercentage = 1.309;
-        int lookback_max = 500;
-
         Queue<Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String>> strategies = new LinkedList<>();
-
 
         for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 1; j < lookback_max; j = Math.round(Math.ceil(j * upPercentage))) {
@@ -107,67 +118,16 @@ public class MovingMomentumStrategyTest {
             }
         }
 
-        List<TradingStatement> result = new LinkedList<>();
-        int counter = 0;
-        int originalSize = strategies.size();
-        while (strategies.size() > 0) {
-            counter++;
-            LOG.info("Executing ta4j keltner triple strategies " + counter + "/" + originalSize);
-
-            Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String> strats = strategies.poll();
-            List<TradingStatement> currentSeriesResult = new LinkedList<>();
-            for (Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator> entry : strats.getKey()) {
-                BacktestExecutor bte = new BacktestExecutor(entry.getKey().getValue(), new LinearTransactionCostModel(0.0026), new ZeroCostModel());
-                Map<Strategy, SellIndicator> toBeExecuted = new HashMap<>();
-                toBeExecuted.put(entry.getKey().getKey(), entry.getValue());
-                currentSeriesResult.addAll(bte.execute(toBeExecuted, entry.getValue().numOf(25), Trade.TradeType.BUY));
-
-                entry.getKey().getKey().destroy();
-            }
-            result.add(combineTradingStatements(currentSeriesResult, strats.getValue()));
-            if (counter % 2 == 0) {
-                System.gc();
-            }
-        }
-
-        result.sort((o1, o2) -> {
-            Num trades1 = o1.getPositionStatsReport().getLossCount().plus(o1.getPositionStatsReport().getProfitCount()).plus(o1.getPositionStatsReport().getBreakEvenCount());
-            Num trades2 = o2.getPositionStatsReport().getLossCount().plus(o2.getPositionStatsReport().getProfitCount()).plus(o2.getPositionStatsReport().getBreakEvenCount());
-
-            if (trades1.isLessThanOrEqual(trades1.numOf(1))) {
-                if (trades2.isLessThanOrEqual(trades1.numOf(1))) {
-                    return 0;
-                } else {
-                    return -1;
-                }
-            }
-            if (trades2.isLessThanOrEqual(trades1.numOf(1))) {
-                return 1;
-            }
-
-            return o1.getPerformanceReport().getTotalProfitLoss().compareTo(o2.getPerformanceReport().getTotalProfitLoss());
-        });
-
-        LOG.info("---Worst result:--- \n" + printReport(result.subList(0, 1)) + "\n-------------");
-        LOG.info("---best results:--- \n" + printReport(result.subList(result.size() - 10, result.size())) + "\n-------------");
-        store(result, "_Ta4jKeltnerTriple_" + System.currentTimeMillis() + "_steps_" + upPercentage + "_maxLookback_" + lookback_max);
+        List<TradingStatement> result = simulateStrategiesWithBreakEvenIndicator(strategies);
+        sortResultsByProfit(result);
+        printAndSaveResults(result, "_Ta4jKeltnerTriple_");
     }
+
+
 
     @Test
     public void testMineKeltnerTrailingTa4j() {
-        Set<BarSeries> allSeries = loadSeries();
-
-        BigDecimal buyFee = new BigDecimal("0.0026");
-        BigDecimal sellFee = new BigDecimal("0.0026");
-        BigDecimal buyFeeFactor = BigDecimal.ONE.add(buyFee);
-        BigDecimal sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
-
-        double upPercentage = 1.309;
-        int lookback_max = 500;
-
         Queue<Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String>> strategies = new LinkedList<>();
-
-
         for (long i = 9; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
                         String currentStrategyName = "i(" + i + "), j(" + j + ")";
@@ -199,63 +159,13 @@ public class MovingMomentumStrategyTest {
 
         }
 
-        List<TradingStatement> result = new LinkedList<>();
-        int counter = 0;
-        int originalSize = strategies.size();
-        while (strategies.size() > 0) {
-            counter++;
-            LOG.info("Executing ta4j keltner strategies " + counter + "/" + originalSize);
-
-            Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String> strats = strategies.poll();
-            List<TradingStatement> currentSeriesResult = new LinkedList<>();
-            for (Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator> entry : strats.getKey()) {
-                BacktestExecutor bte = new BacktestExecutor(entry.getKey().getValue(), new LinearTransactionCostModel(0.0026), new ZeroCostModel());
-                Map<Strategy, SellIndicator> toBeExecuted = new HashMap<>();
-                toBeExecuted.put(entry.getKey().getKey(), entry.getValue());
-                currentSeriesResult.addAll(bte.execute(toBeExecuted, entry.getValue().numOf(25), Trade.TradeType.BUY));
-
-                entry.getKey().getKey().destroy();
-            }
-            result.add(combineTradingStatements(currentSeriesResult, strats.getValue()));
-            if (counter % 2 == 0) {
-                System.gc();
-            }
-        }
-
-        result.sort((o1, o2) -> {
-            Num trades1 = o1.getPositionStatsReport().getLossCount().plus(o1.getPositionStatsReport().getProfitCount()).plus(o1.getPositionStatsReport().getBreakEvenCount());
-            Num trades2 = o2.getPositionStatsReport().getLossCount().plus(o2.getPositionStatsReport().getProfitCount()).plus(o2.getPositionStatsReport().getBreakEvenCount());
-
-            if (trades1.isLessThanOrEqual(trades1.numOf(1))) {
-                if (trades2.isLessThanOrEqual(trades1.numOf(1))) {
-                    return 0;
-                } else {
-                    return -1;
-                }
-            }
-            if (trades2.isLessThanOrEqual(trades1.numOf(1))) {
-                return 1;
-            }
-
-            return o1.getPerformanceReport().getTotalProfitLoss().compareTo(o2.getPerformanceReport().getTotalProfitLoss());
-        });
-        LOG.info("---Worst result:--- \n" + printReport(result.subList(0, 1)) + "\n-------------");
-        LOG.info("---best results:--- \n" + printReport(result.subList(result.size() - 10, result.size())) + "\n-------------");
-        store(result, "_Ta4jKeltner_" + System.currentTimeMillis() + "_steps_" + upPercentage + "_maxLookback_" + lookback_max);
+        List<TradingStatement> result = simulateStrategiesWithBreakEvenIndicator(strategies);
+        sortResultsByProfit(result);
+        printAndSaveResults(result, "_Ta4jKeltner_");
     }
 
     @Test
     public void testMineTa4j() {
-        Set<BarSeries> allSeries = loadSeries();
-
-        BigDecimal buyFee = new BigDecimal("0.0026");
-        BigDecimal sellFee = new BigDecimal("0.0026");
-        BigDecimal buyFeeFactor = BigDecimal.ONE.add(buyFee);
-        BigDecimal sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
-
-        double upPercentage = 1.1545;
-        int lookback_max = 500;
-
         Queue<Map.Entry<List<Map.Entry<Strategy, BarSeries>>, String>> strategies = new LinkedList<>();
 
 
@@ -296,95 +206,9 @@ public class MovingMomentumStrategyTest {
 
         }
 
-        List<TradingStatement> result = new LinkedList<>();
-        int counter = 0;
-        int originalSize = strategies.size();
-        while (strategies.size() > 0) {
-            counter++;
-            LOG.info("Executing ta4j strategies " + counter + "/" + originalSize);
-
-            Map.Entry<List<Map.Entry<Strategy, BarSeries>>, String> strats = strategies.poll();
-            List<TradingStatement> currentSeriesResult = new LinkedList<>();
-            for (Map.Entry<Strategy, BarSeries> entry : strats.getKey()) {
-                BacktestExecutor bte = new BacktestExecutor(entry.getValue(), new LinearTransactionCostModel(0.0026), new ZeroCostModel());
-                List<Strategy> toBeExecuted = new LinkedList<>();
-                toBeExecuted.add(entry.getKey());
-                currentSeriesResult.addAll(bte.execute(toBeExecuted, entry.getValue().numOf(25), Trade.TradeType.BUY));
-
-                entry.getKey().destroy();
-            }
-            result.add(combineTradingStatements(currentSeriesResult, strats.getValue()));
-            if (counter % 1000 == 0) {
-                System.gc();
-            }
-        }
-
-        result.sort((o1, o2) -> {
-            Num trades1 = o1.getPositionStatsReport().getLossCount().plus(o1.getPositionStatsReport().getProfitCount()).plus(o1.getPositionStatsReport().getBreakEvenCount());
-            Num trades2 = o2.getPositionStatsReport().getLossCount().plus(o2.getPositionStatsReport().getProfitCount()).plus(o2.getPositionStatsReport().getBreakEvenCount());
-
-            if (trades1.isLessThanOrEqual(trades1.numOf(1))) {
-                if (trades2.isLessThanOrEqual(trades1.numOf(1))) {
-                    return 0;
-                } else {
-                    return -1;
-                }
-            }
-            if (trades2.isLessThanOrEqual(trades1.numOf(1))) {
-                return 1;
-            }
-
-            return o1.getPerformanceReport().getTotalProfitLoss().compareTo(o2.getPerformanceReport().getTotalProfitLoss());
-        });
-        LOG.info("---Worst result:--- \n" + printReport(result.subList(0, 1)) + "\n-------------");
-        LOG.info("---best results:--- \n" + printReport(result.subList(result.size() - 10, result.size())) + "\n-------------");
-        store(result, "_Ta4jMacd_" + System.currentTimeMillis() + "_steps_" + upPercentage + "_maxLookback_" + lookback_max);
-    }
-
-    private TradingStatement combineTradingStatements(List<TradingStatement> statements, String strategyName) {
-        Num totalProfitLoss = DecimalNum.valueOf(0);
-        Num totalProfitLossPercentage = DecimalNum.valueOf(0);
-        Num totalProfit = DecimalNum.valueOf(0);
-        Num totalLoss = DecimalNum.valueOf(0);
-
-        Num profitCount = DecimalNum.valueOf(0);
-        Num lossCount = DecimalNum.valueOf(0);
-        Num breakEvenCount = DecimalNum.valueOf(0);
-
-        for (TradingStatement statement : statements) {
-            totalProfitLoss = totalProfitLoss.plus(statement.getPerformanceReport().getTotalProfitLoss());
-            totalProfit = totalProfit.plus(statement.getPerformanceReport().getTotalProfit());
-            totalLoss = totalLoss.plus(statement.getPerformanceReport().getTotalLoss());
-
-            profitCount = profitCount.plus(statement.getPositionStatsReport().getProfitCount());
-            lossCount = lossCount.plus(statement.getPositionStatsReport().getLossCount());
-            breakEvenCount = breakEvenCount.plus(statement.getPositionStatsReport().getBreakEvenCount());
-        }
-
-        PerformanceReport combinedPerformceReport = new PerformanceReport(totalProfitLoss, totalProfitLossPercentage, totalProfit, totalLoss);
-        PositionStatsReport combinedPositionReport = new PositionStatsReport(profitCount, lossCount, breakEvenCount);
-
-        return new TradingStatement(new BaseStrategy(strategyName, new FixedRule(), new FixedRule()), combinedPositionReport, combinedPerformceReport);
-    }
-
-    private Set<BarSeries> loadSeries() {
-        List<String> folders = new LinkedList<>();
-        folders.add("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\");
-        folders.add("D:\\Documents\\Programmierung\\bxbot\\recordedMarketData\\");
-
-        Set<BarSeries> result = new HashSet<>();
-        for (String folder: folders) {
-            File f = new File(folder);
-
-            FilenameFilter filter = (f1, name) -> name.toLowerCase(Locale.ROOT).endsWith(".json");
-
-            String[] pathnames = f.list(filter);
-            for (String path: pathnames) {
-                result.add(JsonBarsSerializer.loadSeries(folder + File.separator + path));
-            }
-        }
-        return result;
-
+        List<TradingStatement> result = simulateStrategies(strategies);
+        sortResultsByProfit(result);
+        printAndSaveResults(result, "_Ta4jMacd_");
     }
 
     @Test
@@ -458,27 +282,137 @@ public class MovingMomentumStrategyTest {
             }
         }
 
+        sortResultsByProfit(result);
+        LOG.info(printReport(result.subList(0, 1)));
+        LOG.info(printReport(result.subList(result.size() - 10, result.size())));
+        store(result, "_Ta4jTrailing_" + System.currentTimeMillis() + "_steps_" + upPercentage + "_maxLookback_" + lookback_max + "_maxPercentage_" + DECIMAL_FORMAT.format(percentageUpperBound));
+    }
+
+    private List<TradingStatement> simulateStrategiesWithBreakEvenIndicator(Queue<Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String>> strategies) {
+        List<TradingStatement> result = new LinkedList<>();
+        int counter = 0;
+        int originalSize = strategies.size();
+        while (strategies.size() > 0) {
+            counter++;
+            LOG.info("Executing ta4j strategies " + counter + "/" + originalSize);
+
+            Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String> strats = strategies.poll();
+            List<TradingStatement> currentSeriesResult = new LinkedList<>();
+            for (Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator> entry : strats.getKey()) {
+                BacktestExecutor bte = new BacktestExecutor(entry.getKey().getValue(), new LinearTransactionCostModel(0.0026), new ZeroCostModel());
+                Map<Strategy, SellIndicator> toBeExecuted = new HashMap<>();
+                toBeExecuted.put(entry.getKey().getKey(), entry.getValue());
+                currentSeriesResult.addAll(bte.execute(toBeExecuted, entry.getValue().numOf(25), Trade.TradeType.BUY));
+
+                entry.getKey().getKey().destroy();
+            }
+            result.add(combineTradingStatements(currentSeriesResult, strats.getValue()));
+            if (counter % 2 == 0) {
+                System.gc();
+            }
+        }
+        return result;
+    }
+
+    private List<TradingStatement> simulateStrategies(Queue<Map.Entry<List<Map.Entry<Strategy, BarSeries>>, String>> strategies) {
+        List<TradingStatement> result = new LinkedList<>();
+        int counter = 0;
+        int originalSize = strategies.size();
+        while (strategies.size() > 0) {
+            counter++;
+            LOG.info("Executing ta4j strategies " + counter + "/" + originalSize);
+
+            Map.Entry<List<Map.Entry<Strategy, BarSeries>>, String> strats = strategies.poll();
+            List<TradingStatement> currentSeriesResult = new LinkedList<>();
+            for (Map.Entry<Strategy, BarSeries> entry : strats.getKey()) {
+                BacktestExecutor bte = new BacktestExecutor(entry.getValue(), new LinearTransactionCostModel(0.0026), new ZeroCostModel());
+                List<Strategy> toBeExecuted = new LinkedList<>();
+                toBeExecuted.add(entry.getKey());
+                currentSeriesResult.addAll(bte.execute(toBeExecuted, entry.getValue().numOf(25), Trade.TradeType.BUY));
+
+                entry.getKey().destroy();
+            }
+            result.add(combineTradingStatements(currentSeriesResult, strats.getValue()));
+            if (counter % 1000 == 0) {
+                System.gc();
+            }
+        }
+        return result;
+    }
+
+    private void printAndSaveResults(List<TradingStatement> result, String name) {
+        LOG.info("---Worst result:--- \n" + printReport(result.subList(0, 1)) + "\n-------------");
+        LOG.info("---best results:--- \n" + printReport(result.subList(result.size() - 10, result.size())) + "\n-------------");
+        store(result, name + System.currentTimeMillis() + "_steps_" + upPercentage + "_maxLookback_" + lookback_max);
+    }
+
+    private void sortResultsByProfit(List<TradingStatement> result) {
         result.sort((o1, o2) -> {
             Num trades1 = o1.getPositionStatsReport().getLossCount().plus(o1.getPositionStatsReport().getProfitCount()).plus(o1.getPositionStatsReport().getBreakEvenCount());
             Num trades2 = o2.getPositionStatsReport().getLossCount().plus(o2.getPositionStatsReport().getProfitCount()).plus(o2.getPositionStatsReport().getBreakEvenCount());
 
-            if (trades1.isLessThanOrEqual(series.numOf(1))) {
-                if (trades2.isLessThanOrEqual(series.numOf(1))) {
+            if (trades1.isLessThanOrEqual(trades1.numOf(1))) {
+                if (trades2.isLessThanOrEqual(trades1.numOf(1))) {
                     return 0;
                 } else {
                     return -1;
                 }
             }
-            if (trades2.isLessThanOrEqual(series.numOf(1))) {
+            if (trades2.isLessThanOrEqual(trades1.numOf(1))) {
                 return 1;
             }
 
             return o1.getPerformanceReport().getTotalProfitLoss().compareTo(o2.getPerformanceReport().getTotalProfitLoss());
         });
-        LOG.info(printReport(result.subList(0, 1)));
-        LOG.info(printReport(result.subList(result.size() - 10, result.size())));
-        store(result, "_Ta4jTrailing_" + System.currentTimeMillis() + "_steps_" + upPercentage + "_maxLookback_" + lookback_max + "_maxPercentage_" + DECIMAL_FORMAT.format(percentageUpperBound));
     }
+
+    private TradingStatement combineTradingStatements(List<TradingStatement> statements, String strategyName) {
+        Num totalProfitLoss = DecimalNum.valueOf(0);
+        Num totalProfitLossPercentage = DecimalNum.valueOf(0);
+        Num totalProfit = DecimalNum.valueOf(0);
+        Num totalLoss = DecimalNum.valueOf(0);
+
+        Num profitCount = DecimalNum.valueOf(0);
+        Num lossCount = DecimalNum.valueOf(0);
+        Num breakEvenCount = DecimalNum.valueOf(0);
+
+        for (TradingStatement statement : statements) {
+            totalProfitLoss = totalProfitLoss.plus(statement.getPerformanceReport().getTotalProfitLoss());
+            totalProfit = totalProfit.plus(statement.getPerformanceReport().getTotalProfit());
+            totalLoss = totalLoss.plus(statement.getPerformanceReport().getTotalLoss());
+
+            profitCount = profitCount.plus(statement.getPositionStatsReport().getProfitCount());
+            lossCount = lossCount.plus(statement.getPositionStatsReport().getLossCount());
+            breakEvenCount = breakEvenCount.plus(statement.getPositionStatsReport().getBreakEvenCount());
+        }
+
+        PerformanceReport combinedPerformceReport = new PerformanceReport(totalProfitLoss, totalProfitLossPercentage, totalProfit, totalLoss);
+        PositionStatsReport combinedPositionReport = new PositionStatsReport(profitCount, lossCount, breakEvenCount);
+
+        return new TradingStatement(new BaseStrategy(strategyName, new FixedRule(), new FixedRule()), combinedPositionReport, combinedPerformceReport);
+    }
+
+    private Set<BarSeries> loadSeries() {
+        List<String> folders = new LinkedList<>();
+        folders.add("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\");
+        folders.add("D:\\Documents\\Programmierung\\bxbot\\recordedMarketData\\");
+
+        Set<BarSeries> result = new HashSet<>();
+        for (String folder: folders) {
+            File f = new File(folder);
+
+            FilenameFilter filter = (f1, name) -> name.toLowerCase(Locale.ROOT).endsWith(".json");
+
+            String[] pathnames = f.list(filter);
+            for (String path: pathnames) {
+                result.add(JsonBarsSerializer.loadSeries(folder + File.separator + path));
+            }
+        }
+        return result;
+
+    }
+
+
 
     private Indicator<Num> createMinAboveBreakEvenIndicator(BarSeries series, BigDecimal minAbove, SellIndicator breakEvenIndicator) {
         SellIndicator limitIndicator = SellIndicator.createSellLimitIndicator(series, minAbove, breakEvenIndicator);
