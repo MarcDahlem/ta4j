@@ -74,7 +74,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSerializer;
 
-import ch.qos.logback.classic.spi.IThrowableProxy;
 import ta4jexamples.loaders.JsonBarsSerializer;
 
 public class IntelligentTa4jBenchmarks {
@@ -293,12 +292,11 @@ public class IntelligentTa4jBenchmarks {
             for (long j = 1; j < lookback_max; j = Math.round(Math.ceil(j * upPercentage))) {
                 String currentStrategyName = "i(" + i + "), j(" + j + ")";
                 LOG.info(currentStrategyName);
-                List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>> strategiesForTheSeries = new LinkedList<>();
+                List<StrategyConfiguration> strategiesForTheSeries = new LinkedList<>();
                 for (BarSeries series : allSeries) {
                     StrategyCreationResult creationResult = strategyCreator.apply(Math.toIntExact(i)).apply(Math.toIntExact(j)).apply(series);
                     BaseStrategy strategy = new BaseStrategy(series.getName() + "_" + currentStrategyName, creationResult.getEntryRule(), creationResult.getExitRule());
-                    Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator> createdStrategyWithBreakEven = new AbstractMap.SimpleEntry<>(new AbstractMap.SimpleEntry<>(strategy, series), creationResult.getBreakEvenIndicator());
-                    strategiesForTheSeries.add(createdStrategyWithBreakEven);
+                    strategiesForTheSeries.add(new StrategyConfiguration(strategy, series, creationResult.getBreakEvenIndicator()));
                 }
                 strategies.offer(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
             }
@@ -322,15 +320,14 @@ public class IntelligentTa4jBenchmarks {
 
             int amountStrategies = strats.list.size();
             int strategyCounter = 0;
-            for (Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator> entry : strats.list) {
+            for (StrategyConfiguration entry : strats.list) {
                 strategyCounter++;
                 LOG.info("  * Simulating strategy " + strategyCounter + "/" + amountStrategies);
-                BacktestExecutor bte = new BacktestExecutor(entry.getKey().getValue(), new LinearTransactionCostModel(0.0026), new ZeroCostModel());
+                BacktestExecutor bte = new BacktestExecutor(entry.series, new LinearTransactionCostModel(0.0026), new ZeroCostModel());
                 Map<Strategy, SellIndicator> toBeExecuted = new HashMap<>();
-                toBeExecuted.put(entry.getKey().getKey(), entry.getValue());
-                currentSeriesResult.addAll(bte.execute(toBeExecuted, entry.getValue().numOf(25), Trade.TradeType.BUY));
-
-                entry.getKey().getKey().destroy();
+                toBeExecuted.put(entry.strategy, entry.breakEvenIndicator);
+                currentSeriesResult.addAll(bte.execute(toBeExecuted, entry.series.numOf(25), Trade.TradeType.BUY));
+                entry.strategy.destroy();
             }
             result.add(combineTradingStatements(currentSeriesResult, strats.name));
             if (counter % 2 == 0) {
@@ -534,12 +531,24 @@ public class IntelligentTa4jBenchmarks {
     }
 
     private static class StrategyBenchmarkConfiguration {
-        final List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>> list;
+        final List<StrategyConfiguration> list;
         final String name;
 
-        public StrategyBenchmarkConfiguration(List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>> strategiesForTheSeries, String currentStrategyName) {
+        public StrategyBenchmarkConfiguration(List<StrategyConfiguration> strategiesForTheSeries, String currentStrategyName) {
             list = strategiesForTheSeries;
             name = currentStrategyName;
+        }
+    }
+
+    private static class StrategyConfiguration {
+        final Strategy strategy;
+        final BarSeries series;
+        final SellIndicator breakEvenIndicator;
+
+        private StrategyConfiguration(Strategy strategy, BarSeries series, SellIndicator breakEvenIndicator) {
+            this.strategy = strategy;
+            this.series = series;
+            this.breakEvenIndicator = breakEvenIndicator;
         }
     }
 }
