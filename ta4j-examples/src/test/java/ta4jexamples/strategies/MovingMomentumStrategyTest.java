@@ -63,6 +63,97 @@ public class MovingMomentumStrategyTest {
     }
 
     @Test
+    public void testMineTripleKeltnerTrailingTa4j() {
+        Set<BarSeries> allSeries = loadSeries();
+
+        BigDecimal buyFee = new BigDecimal("0.0026");
+        BigDecimal sellFee = new BigDecimal("0.0026");
+        BigDecimal buyFeeFactor = BigDecimal.ONE.add(buyFee);
+        BigDecimal sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
+
+        double upPercentage = 1.309;
+        int lookback_max = 500;
+
+        Queue<Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String>> strategies = new LinkedList<>();
+
+
+        for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
+            for (long j = 1; j < lookback_max; j = Math.round(Math.ceil(j * upPercentage))) {
+                String currentStrategyName = "i(" + i + "), j(" + j + ")";
+                LOG.info(currentStrategyName);
+                List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>> strategiesForTheSeries = new LinkedList<>();
+                for (BarSeries series : allSeries) {
+                    ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
+                    LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
+                    HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
+                    int keltnerBarCount = Math.toIntExact(i);
+                    int keltnerRatio = Math.toIntExact(j);
+                    Indicator<Num> keltnerTripleMidAsk = new TripleEMAIndicator(askPriceIndicator, keltnerBarCount);
+                    Indicator<Num> keltnerLow = new UnstableIndicator(new KeltnerChannelLowerIndicator(keltnerTripleMidAsk, keltnerRatio, keltnerBarCount), keltnerBarCount);
+
+                    Rule entryRule = new UnderIndicatorRule(askPriceIndicator, keltnerLow);
+
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
+                    Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.02"), breakEvenIndicator);
+                    Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
+
+                    IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
+                    Rule exitRule = new UnderIndicatorRule(bidPriceIndicator, intelligentTrailIndicator);
+
+                    strategiesForTheSeries.add(new AbstractMap.SimpleEntry<>(new AbstractMap.SimpleEntry<>(new BaseStrategy(series.getName() + "_" + currentStrategyName, entryRule, exitRule), series), breakEvenIndicator));
+                }
+                strategies.offer(new AbstractMap.SimpleEntry<>(strategiesForTheSeries, currentStrategyName));
+            }
+        }
+
+        List<TradingStatement> result = new LinkedList<>();
+        int counter = 0;
+        int originalSize = strategies.size();
+        while (strategies.size() > 0) {
+            counter++;
+            LOG.info("Executing ta4j keltner triple strategies " + counter + "/" + originalSize);
+
+            Map.Entry<List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>>, String> strats = strategies.poll();
+            List<TradingStatement> currentSeriesResult = new LinkedList<>();
+            for (Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator> entry : strats.getKey()) {
+                BacktestExecutor bte = new BacktestExecutor(entry.getKey().getValue(), new LinearTransactionCostModel(0.0026), new ZeroCostModel());
+                Map<Strategy, SellIndicator> toBeExecuted = new HashMap<>();
+                toBeExecuted.put(entry.getKey().getKey(), entry.getValue());
+                currentSeriesResult.addAll(bte.execute(toBeExecuted, entry.getValue().numOf(25), Trade.TradeType.BUY));
+
+                entry.getKey().getKey().destroy();
+            }
+            result.add(combineTradingStatements(currentSeriesResult, strats.getValue()));
+            if (counter % 2 == 0) {
+                System.gc();
+            }
+        }
+
+        result.sort((o1, o2) -> {
+            Num trades1 = o1.getPositionStatsReport().getLossCount().plus(o1.getPositionStatsReport().getProfitCount()).plus(o1.getPositionStatsReport().getBreakEvenCount());
+            Num trades2 = o2.getPositionStatsReport().getLossCount().plus(o2.getPositionStatsReport().getProfitCount()).plus(o2.getPositionStatsReport().getBreakEvenCount());
+
+            if (trades1.isLessThanOrEqual(trades1.numOf(1))) {
+                if (trades2.isLessThanOrEqual(trades1.numOf(1))) {
+                    return 0;
+                } else {
+                    return -1;
+                }
+            }
+            if (trades2.isLessThanOrEqual(trades1.numOf(1))) {
+                return 1;
+            }
+
+            return o1.getPerformanceReport().getTotalProfitLoss().compareTo(o2.getPerformanceReport().getTotalProfitLoss());
+        });
+
+        LOG.info("---Worst result:--- \n" + printReport(result.subList(0, 1)) + "\n-------------");
+        LOG.info("---best results:--- \n" + printReport(result.subList(result.size() - 10, result.size())) + "\n-------------");
+        store(result, "_Ta4jKeltnerTriple_" + System.currentTimeMillis() + "_steps_" + upPercentage + "_maxLookback_" + lookback_max);
+    }
+
+    @Test
     public void testMineKeltnerTrailingTa4j() {
         Set<BarSeries> allSeries = loadSeries();
 
@@ -78,7 +169,7 @@ public class MovingMomentumStrategyTest {
 
 
         for (long i = 9; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
-            for (long j = 9; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
+            for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
                         String currentStrategyName = "i(" + i + "), j(" + j + ")";
                         LOG.info(currentStrategyName);
                         List<Map.Entry<Map.Entry<Strategy, BarSeries>, SellIndicator>> strategiesForTheSeries = new LinkedList<>();
@@ -285,12 +376,7 @@ public class MovingMomentumStrategyTest {
         for (String folder: folders) {
             File f = new File(folder);
 
-            FilenameFilter filter = new FilenameFilter() {
-                @Override
-                public boolean accept(File f, String name) {
-                    return name.toLowerCase(Locale.ROOT).endsWith(".json");
-                }
-            };
+            FilenameFilter filter = (f1, name) -> name.toLowerCase(Locale.ROOT).endsWith(".json");
 
             String[] pathnames = f.list(filter);
             for (String path: pathnames) {

@@ -98,7 +98,11 @@ public class BacktestExecutor {
     public List<TradingStatement> execute(Map<Strategy, SellIndicator> strategies, Num amount, Trade.TradeType tradeType) {
         final List<TradingStatement> tradingStatements = new ArrayList<>(strategies.size());
 
+        int counter = 0;
+        int amountStrategies = strategies.entrySet().size();
         for (Map.Entry<Strategy, SellIndicator> strategy : strategies.entrySet()) {
+            counter++;
+            LOG.info("  * Simulating strategy " + counter + "/" + amountStrategies);
             final TradingRecord tradingRecord = seriesManager.run(strategy, tradeType, amount);
             final TradingStatement tradingStatement = tradingStatementGenerator.generate(strategy.getKey(), tradingRecord,
                     seriesManager.getBarSeries());

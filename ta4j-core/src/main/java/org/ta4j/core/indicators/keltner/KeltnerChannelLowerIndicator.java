@@ -23,6 +23,7 @@
  */
 package org.ta4j.core.indicators.keltner;
 
+import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.ATRIndicator;
 import org.ta4j.core.indicators.CachedIndicator;
 import org.ta4j.core.num.Num;
@@ -38,12 +39,12 @@ public class KeltnerChannelLowerIndicator extends CachedIndicator<Num> {
 
     private final ATRIndicator averageTrueRangeIndicator;
 
-    private final KeltnerChannelMiddleIndicator keltnerMiddleIndicator;
+    private final Indicator<Num> keltnerMiddleIndicator;
 
     private final Num ratio;
 
-    public KeltnerChannelLowerIndicator(KeltnerChannelMiddleIndicator keltnerMiddleIndicator, double ratio,
-            int barCountATR) {
+    public KeltnerChannelLowerIndicator(Indicator<Num> keltnerMiddleIndicator, double ratio,
+                                        int barCountATR) {
         super(keltnerMiddleIndicator);
         this.ratio = numOf(ratio);
         this.keltnerMiddleIndicator = keltnerMiddleIndicator;
