@@ -104,10 +104,10 @@ public class IntelligentTa4jBenchmarks {
         buyFeeFactor = BigDecimal.ONE.add(buyFee);
         sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
 
-        upPercentage = 10;
-        //upPercentage = 1.309;
-        lookback_max = 11;
-        //lookback_max = 500;
+        //upPercentage = 10;
+        upPercentage = 1.309;
+        //lookback_max = 11;
+        lookback_max = 500;
 
         upPercentageBig = new BigDecimal(upPercentage);
 
@@ -340,7 +340,7 @@ public class IntelligentTa4jBenchmarks {
             int strategyCounter = 0;
             for (StrategyConfiguration entry : strats.list) {
                 strategyCounter++;
-                LOG.info("  * Simulating strategy " + strategyCounter + "/" + amountStrategies);
+
                 BacktestExecutor bte = new BacktestExecutor(entry.series, new LinearTransactionCostModel(0.0026), new ZeroCostModel());
                 Map<Strategy, SellIndicator> toBeExecuted = new HashMap<>();
                 toBeExecuted.put(entry.strategy, entry.breakEvenIndicator);
@@ -369,7 +369,7 @@ public class IntelligentTa4jBenchmarks {
         store(result, suffix);
     }
 
-    private void sortResultsByProfit(List<TradingStatement> result) {
+    private void sortResultsByProfitPercentage(List<TradingStatement> result) {
         result.sort((o1, o2) -> {
             Num trades1 = o1.getPositionStatsReport().getLossCount().plus(o1.getPositionStatsReport().getProfitCount()).plus(o1.getPositionStatsReport().getBreakEvenCount());
             Num trades2 = o2.getPositionStatsReport().getLossCount().plus(o2.getPositionStatsReport().getProfitCount()).plus(o2.getPositionStatsReport().getBreakEvenCount());
@@ -386,6 +386,26 @@ public class IntelligentTa4jBenchmarks {
             }
 
             return o1.getPerformanceReport().getTotalProfitLossPercentage().compareTo(o2.getPerformanceReport().getTotalProfitLossPercentage());
+        });
+    }
+
+    private void sortResultsByProfit(List<TradingStatement> result) {
+        result.sort((o1, o2) -> {
+            Num trades1 = o1.getPositionStatsReport().getLossCount().plus(o1.getPositionStatsReport().getProfitCount()).plus(o1.getPositionStatsReport().getBreakEvenCount());
+            Num trades2 = o2.getPositionStatsReport().getLossCount().plus(o2.getPositionStatsReport().getProfitCount()).plus(o2.getPositionStatsReport().getBreakEvenCount());
+
+            if (trades1.isLessThanOrEqual(trades1.numOf(1))) {
+                if (trades2.isLessThanOrEqual(trades1.numOf(1))) {
+                    return 0;
+                } else {
+                    return -1;
+                }
+            }
+            if (trades2.isLessThanOrEqual(trades1.numOf(1))) {
+                return 1;
+            }
+
+            return o1.getPerformanceReport().getTotalProfitLoss().compareTo(o2.getPerformanceReport().getTotalProfitLoss());
         });
     }
 
@@ -424,6 +444,12 @@ public class IntelligentTa4jBenchmarks {
     }
 
     private Num combinePercentages(Num totalProfitLossPercentage, Num currentTickSum, Num totalProfitLossPercentageNew, Num newTickSum) {
+        if (currentTickSum.isZero()) {
+            return totalProfitLossPercentageNew;
+        }
+        if (newTickSum.isZero()) {
+            return totalProfitLossPercentage;
+        }
         Num sumOfAllTicks = currentTickSum.plus(newTickSum);
 
         Num currentWeight = currentTickSum.dividedBy (sumOfAllTicks);
