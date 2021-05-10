@@ -230,7 +230,10 @@ public class BarSeriesManager {
                         throw new IllegalStateException("Should operate but neither opened nor new position available");
                     }
                 }
-                tradingRecord.operate(i, barSeries.getBar(i).getClosePrice(), amount);
+                // normalize amount
+                Num closePrice = barSeries.getBar(i).getClosePrice();
+                Num normalizedAmount = amount.dividedBy(closePrice);
+                tradingRecord.operate(i, closePrice, normalizedAmount);
             }
         }
 
