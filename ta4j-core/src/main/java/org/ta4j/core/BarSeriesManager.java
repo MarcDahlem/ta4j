@@ -1,19 +1,19 @@
 /**
  * The MIT License (MIT)
- *
+ * <p>
  * Copyright (c) 2014-2017 Marc de Verdelhan, 2017-2021 Ta4j Organization & respective
  * authors (see AUTHORS)
- *
+ * <p>
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
  * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
  * the Software, and to permit persons to whom the Software is furnished to do so,
  * subject to the following conditions:
- *
+ * <p>
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- *
+ * <p>
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
  * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
@@ -60,7 +60,7 @@ public class BarSeriesManager {
 
     /**
      * Constructor.
-     * 
+     *
      * @param barSeries the bar series to be managed
      */
     public BarSeriesManager(BarSeries barSeries) {
@@ -69,7 +69,7 @@ public class BarSeriesManager {
 
     /**
      * Constructor.
-     * 
+     *
      * @param barSeries            the bar series to be managed
      * @param transactionCostModel the cost model for transactions of the asset
      * @param holdingCostModel     the cost model for holding asset (e.g. borrowing)
@@ -98,7 +98,7 @@ public class BarSeriesManager {
      * Runs the provided strategy over the managed series.
      *
      * Opens the position with a {@link TradeType} BUY trade.
-     * 
+     *
      * @return the trading record coming from the run
      */
     public TradingRecord run(Strategy strategy) {
@@ -110,7 +110,7 @@ public class BarSeriesManager {
      * finishIndex).
      *
      * Opens the position with a {@link TradeType} BUY trade.
-     * 
+     *
      * @param strategy    the trading strategy
      * @param startIndex  the start index for the run (included)
      * @param finishIndex the finish index for the run (included)
@@ -124,7 +124,7 @@ public class BarSeriesManager {
      * Runs the provided strategy over the managed series.
      *
      * Opens the position with a trade of {@link TradeType tradeType}.
-     * 
+     *
      * @param strategy  the trading strategy
      * @param tradeType the {@link TradeType} used to open the position
      * @return the trading record coming from the run
@@ -138,7 +138,7 @@ public class BarSeriesManager {
      * finishIndex).
      *
      * Opens the position with a trade of {@link TradeType tradeType}.
-     * 
+     *
      * @param strategy    the trading strategy
      * @param tradeType   the {@link TradeType} used to open the position
      * @param startIndex  the start index for the run (included)
@@ -232,7 +232,14 @@ public class BarSeriesManager {
                 }
                 // normalize amount
                 Num closePrice = barSeries.getBar(i).getClosePrice();
-                Num normalizedAmount = amount.dividedBy(closePrice);
+                Num normalizedAmount = null;
+                if (tradingRecord.getCurrentPosition().isNew())
+                    normalizedAmount = amount.dividedBy(closePrice);
+                else if (tradingRecord.getCurrentPosition().isOpened()) {
+                    normalizedAmount = tradingRecord.getCurrentPosition().getEntry().getAmount();
+
+                }
+
                 tradingRecord.operate(i, closePrice, normalizedAmount);
             }
         }

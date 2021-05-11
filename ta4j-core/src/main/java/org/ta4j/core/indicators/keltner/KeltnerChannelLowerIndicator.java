@@ -39,11 +39,11 @@ public class KeltnerChannelLowerIndicator extends CachedIndicator<Num> {
 
     private final ATRIndicator averageTrueRangeIndicator;
 
-    private final Indicator<Num> keltnerMiddleIndicator;
+    private final KeltnerChannelMiddleIndicator keltnerMiddleIndicator;
 
     private final Num ratio;
 
-    public KeltnerChannelLowerIndicator(Indicator<Num> keltnerMiddleIndicator, double ratio,
+    public KeltnerChannelLowerIndicator(KeltnerChannelMiddleIndicator keltnerMiddleIndicator, double ratio,
                                         int barCountATR) {
         super(keltnerMiddleIndicator);
         this.ratio = numOf(ratio);

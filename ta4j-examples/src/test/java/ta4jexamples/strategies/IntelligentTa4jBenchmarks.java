@@ -64,6 +64,7 @@ import org.ta4j.core.indicators.helpers.LowestValueIndicator;
 import org.ta4j.core.indicators.helpers.TransformIndicator;
 import org.ta4j.core.indicators.keltner.KeltnerChannelLowerIndicator;
 import org.ta4j.core.indicators.keltner.KeltnerChannelMiddleIndicator;
+import org.ta4j.core.indicators.keltner.KeltnerChannelUpperIndicator;
 import org.ta4j.core.num.DecimalNum;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.reports.PerformanceReport;
@@ -80,6 +81,9 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSerializer;
 
 import ta4jexamples.loaders.JsonBarsSerializer;
+import ta4jexamples.strategies.intelligenthelper.CombineIndicator;
+import ta4jexamples.strategies.intelligenthelper.IntelligentTrailIndicator;
+import ta4jexamples.strategies.intelligenthelper.TripleKeltnerChannelMiddleIndicator;
 
 public class IntelligentTa4jBenchmarks {
 
@@ -105,7 +109,7 @@ public class IntelligentTa4jBenchmarks {
         sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
 
         //upPercentage = 10;
-        upPercentage = 1.309;
+        upPercentage = 1.1545;
         //lookback_max = 11;
         lookback_max = 500;
 
@@ -117,18 +121,12 @@ public class IntelligentTa4jBenchmarks {
     }
 
     @Test
-    public void testMineTripleKeltnerTrailingTa4j() {
-        runBenchmarkForTwoVariables("Ta4jKeltnerTriple",
+    public void benchmarkKeltnerTripleOnlyUpAndTrailingTa4j() {
+        runBenchmarkForTwoVariables("Ta4jKeltnerTripleUp",
                 i -> j -> series -> {
-                    ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
-                    LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
-                    HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
-                    int keltnerBarCount = i;
-                    int keltnerRatio = j;
-                    Indicator<Num> keltnerTripleMidAsk = new TripleEMAIndicator(askPriceIndicator, keltnerBarCount);
-                    Indicator<Num> keltnerLow = new UnstableIndicator(new KeltnerChannelLowerIndicator(keltnerTripleMidAsk, keltnerRatio, keltnerBarCount), keltnerBarCount);
+                    KeltnerRules keltnerRules = createTripleKeltner(i, j, series);
 
-                    Rule entryRule = new UnderIndicatorRule(askPriceIndicator, keltnerLow);
+                    Rule entryRule = new OverIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerHigh);
 
                     SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
                     Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
@@ -136,26 +134,19 @@ public class IntelligentTa4jBenchmarks {
                     Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
 
                     IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
-                    Rule exitRule = new UnderIndicatorRule(bidPriceIndicator, intelligentTrailIndicator);
-
+                    UnderIndicatorRule exitRule = new UnderIndicatorRule(keltnerRules.bidPriceIndicator, intelligentTrailIndicator);
                     return new StrategyCreationResult(entryRule, exitRule, breakEvenIndicator);
                 }
         );
     }
 
     @Test
-    public void testMineKeltnerTrailingTa4j() {
-        runBenchmarkForTwoVariables("Ta4jKeltner",
+    public void benchmarkKeltnerDefaultOnlyUpAndTrailingTa4j() {
+        runBenchmarkForTwoVariables("Ta4jKeltnerUp",
                 i -> j -> series -> {
-                    ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
-                    LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
-                    HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
-                    int keltnerBarCount = Math.toIntExact(i);
-                    int keltnerRatio = Math.toIntExact(j);
-                    KeltnerChannelMiddleIndicator keltnerMidAsk = new KeltnerChannelMiddleIndicator(askPriceIndicator, keltnerBarCount);
-                    KeltnerChannelLowerIndicator keltnerLow = new KeltnerChannelLowerIndicator(keltnerMidAsk, keltnerRatio, keltnerBarCount);
+                    KeltnerRules keltnerRules = createDefaultKeltner(i, j, series);
 
-                    Rule entryRule = new UnderIndicatorRule(askPriceIndicator, keltnerLow);
+                    Rule entryRule = new OverIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerHigh);
 
                     SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
                     Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
@@ -163,14 +154,97 @@ public class IntelligentTa4jBenchmarks {
                     Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
 
                     IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
-                    UnderIndicatorRule exitRule = new UnderIndicatorRule(bidPriceIndicator, intelligentTrailIndicator);
+                    UnderIndicatorRule exitRule = new UnderIndicatorRule(keltnerRules.bidPriceIndicator, intelligentTrailIndicator);
+                    return new StrategyCreationResult(entryRule, exitRule, breakEvenIndicator);
+                }
+        );
+    }
+
+
+
+    @Test
+    public void benchmarkKeltnerTripleUpAndDownTrailingTa4j() {
+        runBenchmarkForTwoVariables("Ta4jKeltnerTripleUpDown",
+                i -> j -> series -> {
+                    KeltnerRules keltnerRules = createTripleKeltner(i, j, series);
+
+                    Rule entryRule = new UnderIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerLow).or(new OverIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerHigh));
+
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
+                    Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.02"), breakEvenIndicator);
+                    Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
+
+                    IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
+                    UnderIndicatorRule exitRule = new UnderIndicatorRule(keltnerRules.bidPriceIndicator, intelligentTrailIndicator);
                     return new StrategyCreationResult(entryRule, exitRule, breakEvenIndicator);
                 }
         );
     }
 
     @Test
-    public void testMineTa4j() {
+    public void benchmarkKeltnerDefaultUpAndDownTrailingTa4j() {
+        runBenchmarkForTwoVariables("Ta4jKeltnerUpDown",
+                i -> j -> series -> {
+                    KeltnerRules keltnerRules = createDefaultKeltner(i, j, series);
+
+                    Rule entryRule = new UnderIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerLow).or(new OverIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerHigh));
+
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
+                    Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.02"), breakEvenIndicator);
+                    Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
+
+                    IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
+                    UnderIndicatorRule exitRule = new UnderIndicatorRule(keltnerRules.bidPriceIndicator, intelligentTrailIndicator);
+                    return new StrategyCreationResult(entryRule, exitRule, breakEvenIndicator);
+                }
+        );
+    }
+
+    @Test
+    public void keltnerRulesKeltnerTripleDownAndTrailingTa4j() {
+        runBenchmarkForTwoVariables("Ta4jKeltnerTripleDown",
+                i -> j -> series -> {
+                    KeltnerRules keltnerRules = createTripleKeltner(i,j,series);
+
+                    Rule entryRule = new UnderIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerLow);
+
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
+                    Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.02"), breakEvenIndicator);
+                    Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
+
+                    IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
+                    Rule exitRule = new UnderIndicatorRule(keltnerRules.bidPriceIndicator, intelligentTrailIndicator);
+
+                    return new StrategyCreationResult(entryRule, exitRule, breakEvenIndicator);
+                }
+        );
+    }
+
+    @Test
+    public void benchmarkKeltnerDefaultDownTrailingTa4j() {
+        runBenchmarkForTwoVariables("Ta4jKeltnerDown",
+                i -> j -> series -> {
+                    KeltnerRules keltnerRules = createDefaultKeltner(i,j,series);
+
+                    Rule entryRule = new UnderIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerLow);
+
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
+                    Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.02"), breakEvenIndicator);
+                    Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
+
+                    IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
+                    UnderIndicatorRule exitRule = new UnderIndicatorRule(keltnerRules.bidPriceIndicator, intelligentTrailIndicator);
+                    return new StrategyCreationResult(entryRule, exitRule, breakEvenIndicator);
+                }
+        );
+    }
+
+    @Test
+    public void benchmarkEmaTa4j() {
         runBenchmarkForFourVariables("Ta4jMacd",
                 i -> j -> k -> l -> series -> {
                     ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
@@ -202,7 +276,7 @@ public class IntelligentTa4jBenchmarks {
     }
 
     @Test
-    public void testMineTa4jTrailing() {
+    public void benchmarkTa4jTrailing() {
         runBenchmarkForSixVariablesPercentage("Ta4jTrailing",
                 i -> j -> k -> below -> above -> minAbove -> series -> {
                     ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
@@ -251,6 +325,22 @@ public class IntelligentTa4jBenchmarks {
         List<TradingStatement> result = simulateStrategies(strategies);
         sortResultsByProfit(result);
         printAndSaveResults(result, "_" + benchmarkName + "_", null);
+    }
+
+    private KeltnerRules createTripleKeltner(Integer keltnerBarCount, Integer keltnerRatio, BarSeries series) {
+        KeltnerRules result = new KeltnerRules(series);
+        result.midAskIndicator = new TripleKeltnerChannelMiddleIndicator(result.askPriceIndicator, keltnerBarCount);
+        result.midBidIndicator = new TripleKeltnerChannelMiddleIndicator(result.bidPriceIndicator, keltnerBarCount);
+        result.createOuterRules(keltnerBarCount, keltnerRatio);
+        return result;
+    }
+
+    private KeltnerRules createDefaultKeltner(Integer keltnerBarCount, Integer keltnerRatio, BarSeries series) {
+        KeltnerRules result = new KeltnerRules(series);
+        result.midAskIndicator = new KeltnerChannelMiddleIndicator(result.askPriceIndicator, keltnerBarCount);
+        result.midBidIndicator = new KeltnerChannelMiddleIndicator(result.bidPriceIndicator, keltnerBarCount);
+        result.createOuterRules(keltnerBarCount, keltnerRatio);
+        return result;
     }
 
     private void runBenchmarkForFourVariables(
@@ -599,6 +689,27 @@ public class IntelligentTa4jBenchmarks {
             this.strategy = strategy;
             this.series = series;
             this.breakEvenIndicator = breakEvenIndicator;
+        }
+    }
+
+    private static class KeltnerRules {
+        private final ClosePriceIndicator closePriceIndicator;
+        private final LowPriceIndicator bidPriceIndicator;
+        private final HighPriceIndicator askPriceIndicator;
+        public KeltnerChannelMiddleIndicator midAskIndicator;
+        public KeltnerChannelMiddleIndicator midBidIndicator;
+        private Indicator<Num> keltnerLow;
+        private Indicator<Num> keltnerHigh;
+
+        private KeltnerRules(BarSeries series) {
+            closePriceIndicator = new ClosePriceIndicator(series);
+            bidPriceIndicator = new LowPriceIndicator(series);
+            askPriceIndicator = new HighPriceIndicator(series);
+        }
+
+        public void createOuterRules(int keltnerBarCount, double keltnerRatio) {
+            keltnerLow =  new UnstableIndicator(new KeltnerChannelLowerIndicator(midAskIndicator, keltnerRatio, keltnerBarCount), keltnerBarCount);
+            keltnerHigh = new UnstableIndicator(new KeltnerChannelUpperIndicator(midBidIndicator, keltnerRatio, keltnerBarCount), keltnerBarCount);
         }
     }
 }
