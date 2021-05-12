@@ -76,6 +76,7 @@ import org.ta4j.core.rules.CrossedDownIndicatorRule;
 import org.ta4j.core.rules.CrossedUpIndicatorRule;
 import org.ta4j.core.rules.FixedRule;
 import org.ta4j.core.rules.OverIndicatorRule;
+import org.ta4j.core.rules.StrictBeforeRule;
 import org.ta4j.core.rules.UnderIndicatorRule;
 
 import com.google.gson.Gson;
@@ -145,12 +146,15 @@ public class IntelligentTa4jBenchmarks {
                     Indicator<Num> lead2Past = new UnstableIndicator(new DelayIndicator(lead2Future, 2*i), 2*i);
 
 
-                    Rule aboveTheCurrentCloud = new OverIndicatorRule(askPriceIndicator, lead1Current).and(new OverIndicatorRule(askPriceIndicator, lead2Current));
+                    CombineIndicator currentCloudUpperLine = CombineIndicator.max(lead1Current, lead2Current);
+                    Rule crossTheCurrentCloudUp = new CrossedUpIndicatorRule(askPriceIndicator, currentCloudUpperLine);
+                    Rule crossTheCurrentCloudDown = new CrossedDownIndicatorRule(askPriceIndicator, currentCloudUpperLine);
+
                     Rule cloudGreenInFuture = new OverIndicatorRule(lead1Future, lead2Future);
                     Rule conversionLineAboveBaseLine = new OverIndicatorRule(conversionLine, baseLine);
                     Rule laggingSpanAbovePastCloud = new OverIndicatorRule(laggingSpan, lead1Past).and(new OverIndicatorRule(laggingSpan, lead2Past));
 
-                    Rule entryRule = aboveTheCurrentCloud.and(cloudGreenInFuture).and(conversionLineAboveBaseLine).and(laggingSpanAbovePastCloud);
+                    Rule entryRule = new StrictBeforeRule(series, crossTheCurrentCloudUp, cloudGreenInFuture.and(conversionLineAboveBaseLine).and(laggingSpanAbovePastCloud), crossTheCurrentCloudDown);
 
                     SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
                     Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
