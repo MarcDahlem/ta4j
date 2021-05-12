@@ -55,13 +55,15 @@ import org.ta4j.core.cost.LinearTransactionCostModel;
 import org.ta4j.core.cost.ZeroCostModel;
 import org.ta4j.core.indicators.EMAIndicator;
 import org.ta4j.core.indicators.SellIndicator;
-import org.ta4j.core.indicators.TripleEMAIndicator;
 import org.ta4j.core.indicators.UnstableIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.HighPriceIndicator;
 import org.ta4j.core.indicators.helpers.LowPriceIndicator;
 import org.ta4j.core.indicators.helpers.LowestValueIndicator;
 import org.ta4j.core.indicators.helpers.TransformIndicator;
+import org.ta4j.core.indicators.ichimoku.IchimokuKijunSenIndicator;
+import org.ta4j.core.indicators.ichimoku.IchimokuLineIndicator;
+import org.ta4j.core.indicators.ichimoku.IchimokuTenkanSenIndicator;
 import org.ta4j.core.indicators.keltner.KeltnerChannelLowerIndicator;
 import org.ta4j.core.indicators.keltner.KeltnerChannelMiddleIndicator;
 import org.ta4j.core.indicators.keltner.KeltnerChannelUpperIndicator;
@@ -83,6 +85,7 @@ import com.google.gson.JsonSerializer;
 import ta4jexamples.loaders.JsonBarsSerializer;
 import ta4jexamples.strategies.intelligenthelper.CombineIndicator;
 import ta4jexamples.strategies.intelligenthelper.IntelligentTrailIndicator;
+import ta4jexamples.strategies.intelligenthelper.DelayIndicator;
 import ta4jexamples.strategies.intelligenthelper.TripleKeltnerChannelMiddleIndicator;
 
 public class IntelligentTa4jBenchmarks {
@@ -118,6 +121,47 @@ public class IntelligentTa4jBenchmarks {
         percentageUpperBound = new BigDecimal("0.001");
         percentageUpperBound = new BigDecimal("0.1");
 
+    }
+
+    @Test
+    public void benchmarkIchimokuTrailingTa4j() {
+        runBenchmarkForTwoVariables("IchimokuTrailing",
+                i -> j -> series -> {
+                    ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
+                    LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
+                    HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
+
+
+                    IchimokuTenkanSenIndicator conversionLine = new IchimokuTenkanSenIndicator(series, j); //9
+                    IchimokuKijunSenIndicator baseLine = new IchimokuKijunSenIndicator(series, i); //26
+                    Indicator<Num> laggingSpan = new UnstableIndicator(new DelayIndicator(askPriceIndicator, i), i); //26 behind
+                    TransformIndicator lead1Future = TransformIndicator.divide(CombineIndicator.plus(conversionLine, baseLine), 2); //26
+                    IchimokuLineIndicator lead2Future = new IchimokuLineIndicator(series, 2 * i); // 52
+
+                    Indicator<Num> lead1Current = new UnstableIndicator(new DelayIndicator(lead1Future, i), i);
+                    Indicator<Num> lead2Current = new UnstableIndicator(new DelayIndicator(lead2Future, i), i);
+
+                    Indicator<Num> lead1Past = new UnstableIndicator(new DelayIndicator(lead1Future, 2*i), 2*i);
+                    Indicator<Num> lead2Past = new UnstableIndicator(new DelayIndicator(lead2Future, 2*i), 2*i);
+
+
+                    Rule aboveTheCurrentCloud = new OverIndicatorRule(askPriceIndicator, lead1Current).and(new OverIndicatorRule(askPriceIndicator, lead2Current));
+                    Rule cloudGreenInFuture = new OverIndicatorRule(lead1Future, lead2Future);
+                    Rule conversionLineAboveBaseLine = new OverIndicatorRule(conversionLine, baseLine);
+                    Rule laggingSpanAbovePastCloud = new OverIndicatorRule(laggingSpan, lead1Past).and(new OverIndicatorRule(laggingSpan, lead2Past));
+
+                    Rule entryRule = aboveTheCurrentCloud.and(cloudGreenInFuture).and(conversionLineAboveBaseLine).and(laggingSpanAbovePastCloud);
+
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
+                    Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.02"), breakEvenIndicator);
+                    Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
+
+                    IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
+                    UnderIndicatorRule exitRule = new UnderIndicatorRule(bidPriceIndicator, intelligentTrailIndicator);
+                    return new StrategyCreationResult(entryRule, exitRule, breakEvenIndicator);
+                }
+        );
     }
 
     @Test
