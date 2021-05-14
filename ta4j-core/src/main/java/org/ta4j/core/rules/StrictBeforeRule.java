@@ -1,12 +1,11 @@
 package org.ta4j.core.rules;
 
 import org.ta4j.core.BarSeries;
-import org.ta4j.core.Indicator;
 import org.ta4j.core.Rule;
 import org.ta4j.core.TradingRecord;
-import org.ta4j.core.num.Num;
+import org.ta4j.core.rules.AbstractRule;
 
-public class StrictBeforeRule extends AbstractRule{
+public class StrictBeforeRule extends AbstractRule {
 
     private final BarSeries series;
     private final Rule firstCondition;
@@ -31,10 +30,6 @@ public class StrictBeforeRule extends AbstractRule{
 
         for (int i=index; i>=series.getBeginIndex(); i--) {
             if(resetCondition.isSatisfied(i, tradingRecord)) {
-                traceIsSatisfied(index, false);
-                return false;
-            }
-            if (i<index && secondCondition.isSatisfied(i, tradingRecord)) {
                 traceIsSatisfied(index, false);
                 return false;
             }
