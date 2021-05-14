@@ -124,10 +124,10 @@ public class IntelligentTa4jBenchmarks {
         buyFeeFactor = BigDecimal.ONE.add(buyFee);
         sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
 
-        upPercentage = 2;
-        //upPercentage = 1.1545;
-        lookback_max = 100;
-        //lookback_max = 8000;
+        //upPercentage = 10;
+        upPercentage = 1.618;
+        //lookback_max = 11;
+        lookback_max = 8000;
 
         upPercentageBig = new BigDecimal(upPercentage);
 
