@@ -124,10 +124,10 @@ public class IntelligentTa4jBenchmarks {
         buyFeeFactor = BigDecimal.ONE.add(buyFee);
         sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
 
-        //upPercentage = 10;
-        upPercentage = 1.1545;
-        //lookback_max = 11;
-        lookback_max = 8000;
+        upPercentage = 2;
+        //upPercentage = 1.1545;
+        lookback_max = 100;
+        //lookback_max = 8000;
 
         upPercentageBig = new BigDecimal(upPercentage);
 
@@ -140,67 +140,30 @@ public class IntelligentTa4jBenchmarks {
     public void benchmarkIchimokuStopLossOrGainTa4j() {
         runBenchmarkForTwoVariables("IchimokuStopLossOrGain",
                 i -> j -> series -> {
-                    ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
-                    LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
-                    HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
-                    int ICHIMOKU_LONG_SPAN = i;
-                    int ICHIMOKU_SHORT_SPAN = j;
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    IchimokuRules ichimokuRules = createIchimokuBuyRule(series, i, j, breakEvenIndicator);
 
-
-                    IchimokuTenkanSenIndicator conversionLine = new IchimokuTenkanSenIndicator(series, ICHIMOKU_SHORT_SPAN); //9
-                    IchimokuKijunSenIndicator baseLine = new IchimokuKijunSenIndicator(series, ICHIMOKU_LONG_SPAN); //26
-                    IchimokuLaggingSpanIndicator laggingSpanAsk = new IchimokuLaggingSpanIndicator(askPriceIndicator);
-                    IchimokuLaggingSpanIndicator laggingSpanBid = new IchimokuLaggingSpanIndicator(bidPriceIndicator);
-                    IchimokuLead1FutureIndicator lead1Future = new IchimokuLead1FutureIndicator(conversionLine, baseLine); //26
-                    IchimokuLead2FutureIndicator lead2Future = new IchimokuLead2FutureIndicator(series, 2 * ICHIMOKU_LONG_SPAN); // 52
-
-                    UnstableIndicator lead1Current = new UnstableIndicator(new DelayIndicator(lead1Future, ICHIMOKU_LONG_SPAN), ICHIMOKU_LONG_SPAN);
-                    UnstableIndicator lead2Current = new UnstableIndicator(new DelayIndicator(lead2Future, ICHIMOKU_LONG_SPAN), ICHIMOKU_LONG_SPAN);
-
-                    Indicator<Num> lead1Past = new UnstableIndicator(new DelayIndicator(lead1Future, 2 * ICHIMOKU_LONG_SPAN), 2 * ICHIMOKU_LONG_SPAN);
-                    Indicator<Num> lead2Past = new UnstableIndicator(new DelayIndicator(lead2Future, 2 * ICHIMOKU_LONG_SPAN), 2 * ICHIMOKU_LONG_SPAN);
-
-
-                    CombineIndicator currentCloudUpperLine = CombineIndicator.max(lead1Current, lead2Current);
-                    CombineIndicator currentCloudLowerLine = CombineIndicator.min(lead1Current, lead2Current);
-
-                    Rule crossTheCurrentCloudUpperUp = new CrossedUpIndicatorRule(askPriceIndicator, currentCloudUpperLine);
-                    Rule crossTheCurrentCloudUpperDown = new CrossedDownIndicatorRule(askPriceIndicator, currentCloudUpperLine);
-
-                    Rule crossTheCurrentCloudLowerUp = new CrossedUpIndicatorRule(askPriceIndicator, currentCloudLowerLine);
-                    Rule crossTheCurrentCloudLowerDown = new CrossedDownIndicatorRule(askPriceIndicator, currentCloudLowerLine);
-
-                    OverIndicatorRule cloudGreenInFuture = new OverIndicatorRule(lead1Future, lead2Future);
-                    OverIndicatorRule conversionLineAboveBaseLine = new OverIndicatorRule(conversionLine, baseLine);
-                    Rule laggingSpanAbovePastCloud = new OverIndicatorRule(laggingSpanAsk, lead1Past).and(new OverIndicatorRule(laggingSpanAsk, lead2Past));
-
-                    SellIndicator cloudLowerLineAtBuyPrice = new SellIndicator(series, (buyIndex, index) -> new ConstantIndicator<>(series, currentCloudLowerLine.getValue(buyIndex)));
-
-                    BooleanIndicatorRule trueInBuyPhases = new BooleanIndicatorRule(new TrueInBuyPhaseIndicator(series, cloudLowerLineAtBuyPrice));
-
-                    Rule resetUpperCrossUpOn = crossTheCurrentCloudUpperDown.or(trueInBuyPhases);
-                    Rule resetLowerCrossUpOn = crossTheCurrentCloudLowerDown.or(trueInBuyPhases);
-
-                    Rule crossingIndipendentIchimokuSignals = cloudGreenInFuture.and(conversionLineAboveBaseLine).and(laggingSpanAbovePastCloud);
-                    StrictBeforeRule crossUpperAndIchimokuSignals = new StrictBeforeRule(series, crossTheCurrentCloudUpperUp, crossingIndipendentIchimokuSignals, resetUpperCrossUpOn);
-
-                    StrictBeforeRule entryRule = new StrictBeforeRule(series, crossTheCurrentCloudLowerUp, crossUpperAndIchimokuSignals, resetLowerCrossUpOn);
+                    Rule entryRule = ichimokuRules.getEntryRule();
 
 
                     Number targetToRiskRatio = 2;
-                    Indicator<Num> buyPriceIndicator = new SellIndicator(series, cloudLowerLineAtBuyPrice, (buyIndex, index) -> new ConstantIndicator<>(series, askPriceIndicator.getValue(buyIndex)));
 
+                    Indicator<Num> buyPriceIndicator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, ichimokuRules.askPriceIndicator.getValue(buyIndex)));
+                    SellIndicator cloudLowerLineAtBuyPrice = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, ichimokuRules.currentCloudLowerLine.getValue(buyIndex)));
+
+                    LowPriceIndicator bidPriceIndicator = ichimokuRules.bidPriceIndicator;
                     CombineIndicator sellPriceGainCal = multiply(plus(multiply(minus(divide(bidPriceIndicator, cloudLowerLineAtBuyPrice), 1), targetToRiskRatio), 1), buyPriceIndicator);
-                    SellIndicator gainSellPriceCalculator = new SellIndicator(series, cloudLowerLineAtBuyPrice, (buyIndex, index) -> new ConstantIndicator<>(series, sellPriceGainCal.getValue(buyIndex)));
-
-                    Rule takeProfitReached = new OverIndicatorRule(bidPriceIndicator, gainSellPriceCalculator);
-                    UnstableIndicator delayedBidPrice = new UnstableIndicator(new DelayIndicator(bidPriceIndicator, ICHIMOKU_LONG_SPAN), ICHIMOKU_LONG_SPAN);
+                    SellIndicator gainSellPriceCalculator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, sellPriceGainCal.getValue(buyIndex)));
+                    IchimokuLaggingSpanIndicator laggingSpanBid = new IchimokuLaggingSpanIndicator(bidPriceIndicator);
+                    Rule takeProfitAndBreakEvenReached = new OverIndicatorRule(bidPriceIndicator, gainSellPriceCalculator).and(new OverIndicatorRule(bidPriceIndicator, breakEvenIndicator));
+                    UnstableIndicator delayedBidPrice = new UnstableIndicator(new DelayIndicator(bidPriceIndicator, i), i);
                     UnderIndicatorRule laggingSpanEmergencyStopReached = new UnderIndicatorRule(laggingSpanBid, delayedBidPrice);
                     UnderIndicatorRule stopLossReached = new UnderIndicatorRule(bidPriceIndicator, cloudLowerLineAtBuyPrice);
 
-                    Rule exitRule = stopLossReached.or(takeProfitReached).or(laggingSpanEmergencyStopReached);
+                    Rule exitRule = stopLossReached.or(takeProfitAndBreakEvenReached).or(laggingSpanEmergencyStopReached);
 
-                    return new StrategyCreationResult(entryRule, exitRule, cloudLowerLineAtBuyPrice);
+
+                    return new StrategyCreationResult(entryRule, exitRule, breakEvenIndicator);
                 }
         );
     }
@@ -209,41 +172,17 @@ public class IntelligentTa4jBenchmarks {
     public void benchmarkIchimokuTrailingTa4j() {
         runBenchmarkForTwoVariables("IchimokuTrailing",
                 i -> j -> series -> {
-                    ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
-                    LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
-                    HighPriceIndicator askPriceIndicator = new HighPriceIndicator(series);
-
-
-                    IchimokuTenkanSenIndicator conversionLine = new IchimokuTenkanSenIndicator(series, j); //9
-                    IchimokuKijunSenIndicator baseLine = new IchimokuKijunSenIndicator(series, i); //26
-                    Indicator<Num> laggingSpan = askPriceIndicator; //26 behind
-                    TransformIndicator lead1Future = TransformIndicator.divide(CombineIndicator.plus(conversionLine, baseLine), 2); //26
-                    IchimokuLineIndicator lead2Future = new IchimokuLineIndicator(series, 2 * i); // 52
-
-                    Indicator<Num> lead1Current = new UnstableIndicator(new DelayIndicator(lead1Future, i), i);
-                    Indicator<Num> lead2Current = new UnstableIndicator(new DelayIndicator(lead2Future, i), i);
-
-                    Indicator<Num> lead1Past = new UnstableIndicator(new DelayIndicator(lead1Future, 2*i), 2*i);
-                    Indicator<Num> lead2Past = new UnstableIndicator(new DelayIndicator(lead2Future, 2*i), 2*i);
-
-
-                    CombineIndicator currentCloudUpperLine = CombineIndicator.max(lead1Current, lead2Current);
-                    Rule crossTheCurrentCloudUp = new CrossedUpIndicatorRule(askPriceIndicator, currentCloudUpperLine);
-                    Rule crossTheCurrentCloudDown = new CrossedDownIndicatorRule(askPriceIndicator, currentCloudUpperLine);
-
-                    Rule cloudGreenInFuture = new OverIndicatorRule(lead1Future, lead2Future);
-                    Rule conversionLineAboveBaseLine = new OverIndicatorRule(conversionLine, baseLine);
-                    Rule laggingSpanAbovePastCloud = new OverIndicatorRule(laggingSpan, lead1Past).and(new OverIndicatorRule(laggingSpan, lead2Past));
-
-                    Rule entryRule = new StrictBeforeRule(series, crossTheCurrentCloudUp, cloudGreenInFuture.and(conversionLineAboveBaseLine).and(laggingSpanAbovePastCloud), crossTheCurrentCloudDown);
-
                     SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    IchimokuRules ichimokuRules = createIchimokuBuyRule(series, i, j, breakEvenIndicator);
+                    Rule entryRule = ichimokuRules.getEntryRule();
+
+
                     Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
                     Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.02"), breakEvenIndicator);
                     Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
 
                     IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
-                    UnderIndicatorRule exitRule = new UnderIndicatorRule(bidPriceIndicator, intelligentTrailIndicator);
+                    UnderIndicatorRule exitRule = new UnderIndicatorRule(ichimokuRules.bidPriceIndicator, intelligentTrailIndicator);
                     return new StrategyCreationResult(entryRule, exitRule, breakEvenIndicator);
                 }
         );
@@ -290,7 +229,6 @@ public class IntelligentTa4jBenchmarks {
     }
 
 
-
     @Test
     public void benchmarkKeltnerTripleUpAndDownTrailingTa4j() {
         runBenchmarkForTwoVariables("Ta4jKeltnerTripleUpDown",
@@ -335,7 +273,7 @@ public class IntelligentTa4jBenchmarks {
     public void keltnerRulesKeltnerTripleDownAndTrailingTa4j() {
         runBenchmarkForTwoVariables("Ta4jKeltnerTripleDown",
                 i -> j -> series -> {
-                    KeltnerRules keltnerRules = createTripleKeltner(i,j,series);
+                    KeltnerRules keltnerRules = createTripleKeltner(i, j, series);
 
                     Rule entryRule = new UnderIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerLow);
 
@@ -356,7 +294,7 @@ public class IntelligentTa4jBenchmarks {
     public void benchmarkKeltnerDefaultDownTrailingTa4j() {
         runBenchmarkForTwoVariables("Ta4jKeltnerDown",
                 i -> j -> series -> {
-                    KeltnerRules keltnerRules = createDefaultKeltner(i,j,series);
+                    KeltnerRules keltnerRules = createDefaultKeltner(i, j, series);
 
                     Rule entryRule = new UnderIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerLow);
 
@@ -454,6 +392,52 @@ public class IntelligentTa4jBenchmarks {
         List<TradingStatement> result = simulateStrategies(strategies);
         sortResultsByProfit(result);
         printAndSaveResults(result, "_" + benchmarkName + "_", null);
+    }
+
+    private IchimokuRules createIchimokuBuyRule(BarSeries series, int ICHIMOKU_LONG_SPAN, int ICHIMOKU_SHORT_SPAN, SellIndicator breakEvenIndicator) {
+        IchimokuRules result = new IchimokuRules(series);
+        IchimokuTenkanSenIndicator conversionLine = new IchimokuTenkanSenIndicator(series, ICHIMOKU_SHORT_SPAN); //9
+        IchimokuKijunSenIndicator baseLine = new IchimokuKijunSenIndicator(series, ICHIMOKU_LONG_SPAN); //26
+        IchimokuLaggingSpanIndicator laggingSpanAsk = new IchimokuLaggingSpanIndicator(result.askPriceIndicator);
+
+        IchimokuLead1FutureIndicator lead1Future = new IchimokuLead1FutureIndicator(conversionLine, baseLine); //26
+        IchimokuLead2FutureIndicator lead2Future = new IchimokuLead2FutureIndicator(series, 2 * ICHIMOKU_LONG_SPAN); // 52
+
+        UnstableIndicator lead1Current = new UnstableIndicator(new DelayIndicator(lead1Future, ICHIMOKU_LONG_SPAN), ICHIMOKU_LONG_SPAN);
+        UnstableIndicator lead2Current = new UnstableIndicator(new DelayIndicator(lead2Future, ICHIMOKU_LONG_SPAN), ICHIMOKU_LONG_SPAN);
+
+        Indicator<Num> lead1Past = new UnstableIndicator(new DelayIndicator(lead1Future, 2 * ICHIMOKU_LONG_SPAN), 2 * ICHIMOKU_LONG_SPAN);
+        Indicator<Num> lead2Past = new UnstableIndicator(new DelayIndicator(lead2Future, 2 * ICHIMOKU_LONG_SPAN), 2 * ICHIMOKU_LONG_SPAN);
+
+
+        CombineIndicator currentCloudUpperLine = CombineIndicator.max(lead1Current, lead2Current);
+        CombineIndicator currentCloudLowerLine = CombineIndicator.min(lead1Current, lead2Current);
+        result.currentCloudLowerLine = currentCloudLowerLine;
+
+        Rule crossTheCurrentCloudUpperUp = new CrossedUpIndicatorRule(result.askPriceIndicator, currentCloudUpperLine);
+        Rule crossTheCurrentCloudUpperDown = new CrossedDownIndicatorRule(result.askPriceIndicator, currentCloudUpperLine);
+
+        Rule crossTheCurrentCloudLowerUp = new CrossedUpIndicatorRule(result.askPriceIndicator, currentCloudLowerLine);
+        Rule crossTheCurrentCloudLowerDown = new CrossedDownIndicatorRule(result.askPriceIndicator, currentCloudLowerLine);
+
+        OverIndicatorRule cloudGreenInFuture = new OverIndicatorRule(lead1Future, lead2Future);
+        OverIndicatorRule conversionLineAboveBaseLine = new OverIndicatorRule(conversionLine, baseLine);
+        Rule laggingSpanAbovePastCloud = new OverIndicatorRule(laggingSpanAsk, lead1Past).and(new OverIndicatorRule(laggingSpanAsk, lead2Past));
+
+
+        BooleanIndicatorRule trueInBuyPhases = new BooleanIndicatorRule(new TrueInBuyPhaseIndicator(series, breakEvenIndicator));
+
+        Rule resetUpperCrossUpOn = crossTheCurrentCloudUpperDown
+                .or(trueInBuyPhases);
+        Rule resetLowerCrossUpOn = crossTheCurrentCloudLowerDown
+                .or(trueInBuyPhases);
+
+        Rule crossingIndipendentIchimokuSignals = cloudGreenInFuture.and(conversionLineAboveBaseLine).and(laggingSpanAbovePastCloud);
+        StrictBeforeRule crossUpperAndIchimokuSignals = new StrictBeforeRule(series, crossTheCurrentCloudUpperUp, crossingIndipendentIchimokuSignals, resetUpperCrossUpOn);
+
+        StrictBeforeRule entryRule = new StrictBeforeRule(series, crossTheCurrentCloudLowerUp, crossUpperAndIchimokuSignals, resetLowerCrossUpOn);
+        result.setEntryRule(entryRule);
+        return result;
     }
 
     private KeltnerRules createTripleKeltner(Integer keltnerBarCount, Integer keltnerRatio, BarSeries series) {
@@ -671,7 +655,7 @@ public class IntelligentTa4jBenchmarks {
         }
         Num sumOfAllTicks = currentTickSum.plus(newTickSum);
 
-        Num currentWeight = currentTickSum.dividedBy (sumOfAllTicks);
+        Num currentWeight = currentTickSum.dividedBy(sumOfAllTicks);
         Num newWeight = newTickSum.dividedBy(sumOfAllTicks);
 
         Num weightedNewValue = totalProfitLossPercentageNew.multipliedBy(newWeight);
@@ -837,8 +821,31 @@ public class IntelligentTa4jBenchmarks {
         }
 
         public void createOuterRules(int keltnerBarCount, double keltnerRatio) {
-            keltnerLow =  new UnstableIndicator(new KeltnerChannelLowerIndicator(midAskIndicator, keltnerRatio, keltnerBarCount), keltnerBarCount);
+            keltnerLow = new UnstableIndicator(new KeltnerChannelLowerIndicator(midAskIndicator, keltnerRatio, keltnerBarCount), keltnerBarCount);
             keltnerHigh = new UnstableIndicator(new KeltnerChannelUpperIndicator(midBidIndicator, keltnerRatio, keltnerBarCount), keltnerBarCount);
+        }
+    }
+
+    private static class IchimokuRules {
+        private final ClosePriceIndicator closePriceIndicator;
+        private final LowPriceIndicator bidPriceIndicator;
+        private final HighPriceIndicator askPriceIndicator;
+        public Indicator<Num> currentCloudLowerLine;
+        private Rule entryRule;
+
+
+        private IchimokuRules(BarSeries series) {
+            closePriceIndicator = new ClosePriceIndicator(series);
+            bidPriceIndicator = new LowPriceIndicator(series);
+            askPriceIndicator = new HighPriceIndicator(series);
+        }
+
+        public void setEntryRule(Rule entryRule) {
+            this.entryRule = entryRule;
+        }
+
+        public Rule getEntryRule() {
+            return entryRule;
         }
     }
 }
