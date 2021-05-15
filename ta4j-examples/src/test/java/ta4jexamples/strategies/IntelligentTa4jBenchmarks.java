@@ -170,12 +170,13 @@ public class IntelligentTa4jBenchmarks {
 
                     Number targetToRiskRatio = 2;
 
-                    Indicator<Num> buyPriceIndicator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, ichimokuRules.askPriceIndicator.getValue(buyIndex)));
-                    SellIndicator cloudLowerLineAtBuyPrice = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, ichimokuRules.currentCloudLowerLine.getValue(buyIndex)));
 
+                    SellIndicator cloudLowerLineAtBuyPrice = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, ichimokuRules.currentCloudLowerLine.getValue(buyIndex)));
+                    Indicator<Num> buyPriceIndicator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, ichimokuRules.askPriceIndicator.getValue(buyIndex)));
 
                     CombineIndicator sellPriceGainCal = multiply(plus(multiply(minus(divide(ichimokuRules.bidPriceIndicator, cloudLowerLineAtBuyPrice), 1), targetToRiskRatio), 1), buyPriceIndicator);
                     SellIndicator gainSellPriceCalculator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, sellPriceGainCal.getValue(buyIndex)));
+
                     Rule takeProfitAndBreakEvenReached = new OverIndicatorRule(ichimokuRules.bidPriceIndicator, gainSellPriceCalculator).and(new OverIndicatorRule(ichimokuRules.bidPriceIndicator, breakEvenIndicator));
                     UnstableIndicator delayedBidPrice = new UnstableIndicator(new DelayIndicator(ichimokuRules.bidPriceIndicator, i), i);
                     UnderIndicatorRule laggingSpanEmergencyStopReached = new UnderIndicatorRule(ichimokuRules.laggingSpan, delayedBidPrice);
