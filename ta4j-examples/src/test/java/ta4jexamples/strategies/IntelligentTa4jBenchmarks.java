@@ -125,7 +125,7 @@ public class IntelligentTa4jBenchmarks {
         sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
 
         //upPercentage = 10;
-        upPercentage = 1.618;
+        upPercentage = 1.309;
         //lookback_max = 11;
         lookback_max = 8000;
 
@@ -152,6 +152,36 @@ public class IntelligentTa4jBenchmarks {
                     UnderIndicatorRule stopLossReached = new UnderIndicatorRule(ichimokuRules.bidPriceIndicator, cloudLowerLineAtBuyPrice);
 
                     Rule exitRule = stopLossReached.or(laggingSpanEmergencyStopReached);
+
+                    return new StrategyCreationResult(entryRule, exitRule, breakEvenIndicator);
+                }
+        );
+    }
+
+    @Test
+    public void benchmarkIchimokuStopLossOrGainWithoutLaggingSpanTa4j() {
+        runBenchmarkForTwoVariables("IchimokuStopLossOrGainWithoutLaggingSpan",
+                i -> j -> series -> {
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    IchimokuRules ichimokuRules = createIchimokuBuyRule(series, i, j, breakEvenIndicator);
+
+                    Rule entryRule = ichimokuRules.getEntryRule();
+
+
+                    Number targetToRiskRatio = 2;
+
+
+                    SellIndicator cloudLowerLineAtBuyPrice = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, ichimokuRules.currentCloudLowerLine.getValue(buyIndex)));
+                    Indicator<Num> buyPriceIndicator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, ichimokuRules.askPriceIndicator.getValue(buyIndex)));
+
+                    CombineIndicator sellPriceGainCal = multiply(plus(multiply(minus(divide(ichimokuRules.bidPriceIndicator, cloudLowerLineAtBuyPrice), 1), targetToRiskRatio), 1), buyPriceIndicator);
+                    SellIndicator gainSellPriceCalculator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, sellPriceGainCal.getValue(buyIndex)));
+
+                    Rule takeProfitAndBreakEvenReached = new OverIndicatorRule(ichimokuRules.bidPriceIndicator, gainSellPriceCalculator).and(new OverIndicatorRule(ichimokuRules.bidPriceIndicator, breakEvenIndicator));
+                    UnderIndicatorRule stopLossReached = new UnderIndicatorRule(ichimokuRules.bidPriceIndicator, cloudLowerLineAtBuyPrice);
+
+                    Rule exitRule = stopLossReached.or(takeProfitAndBreakEvenReached);
+
 
                     return new StrategyCreationResult(entryRule, exitRule, breakEvenIndicator);
                 }
@@ -567,7 +597,7 @@ public class IntelligentTa4jBenchmarks {
             int strategyCounter = 0;
             for (StrategyConfiguration entry : strats.list) {
                 strategyCounter++;
-
+                LOG.info("  * Simulating strategy " + strategyCounter + "/" + amountStrategies);
                 BacktestExecutor bte = new BacktestExecutor(entry.series, new LinearTransactionCostModel(0.0026), new ZeroCostModel());
                 Map<Strategy, SellIndicator> toBeExecuted = new HashMap<>();
                 toBeExecuted.put(entry.strategy, entry.breakEvenIndicator);
