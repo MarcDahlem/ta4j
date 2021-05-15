@@ -137,6 +137,30 @@ public class IntelligentTa4jBenchmarks {
     }
 
     @Test
+    public void benchmarkIchimokuStopLossOrLaggingCrossTa4j() {
+        runBenchmarkForTwoVariables("IchimokuStopLossOrLaggingCross",
+                i -> j -> series -> {
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    IchimokuRules ichimokuRules = createIchimokuBuyRule(series, i, j, breakEvenIndicator);
+
+                    Rule entryRule = ichimokuRules.getEntryRule();
+
+                    SellIndicator cloudLowerLineAtBuyPrice = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, ichimokuRules.currentCloudLowerLine.getValue(buyIndex)));
+
+                    LowPriceIndicator bidPriceIndicator = ichimokuRules.bidPriceIndicator;
+                    IchimokuLaggingSpanIndicator laggingSpanBid = new IchimokuLaggingSpanIndicator(bidPriceIndicator);
+                    UnstableIndicator delayedBaseline = new UnstableIndicator(new DelayIndicator(ichimokuRules.baseLine, i), i);
+                    UnderIndicatorRule laggingSpanEmergencyStopReached = new UnderIndicatorRule(laggingSpanBid, delayedBaseline);
+                    UnderIndicatorRule stopLossReached = new UnderIndicatorRule(bidPriceIndicator, cloudLowerLineAtBuyPrice);
+
+                    Rule exitRule = stopLossReached.or(laggingSpanEmergencyStopReached);
+
+                    return new StrategyCreationResult(entryRule, exitRule, breakEvenIndicator);
+                }
+        );
+    }
+
+    @Test
     public void benchmarkIchimokuStopLossOrGainTa4j() {
         runBenchmarkForTwoVariables("IchimokuStopLossOrGain",
                 i -> j -> series -> {
@@ -398,6 +422,7 @@ public class IntelligentTa4jBenchmarks {
         IchimokuRules result = new IchimokuRules(series);
         IchimokuTenkanSenIndicator conversionLine = new IchimokuTenkanSenIndicator(series, ICHIMOKU_SHORT_SPAN); //9
         IchimokuKijunSenIndicator baseLine = new IchimokuKijunSenIndicator(series, ICHIMOKU_LONG_SPAN); //26
+        result.baseLine = baseLine;
         IchimokuLaggingSpanIndicator laggingSpanAsk = new IchimokuLaggingSpanIndicator(result.askPriceIndicator);
 
         IchimokuLead1FutureIndicator lead1Future = new IchimokuLead1FutureIndicator(conversionLine, baseLine); //26
@@ -423,6 +448,7 @@ public class IntelligentTa4jBenchmarks {
         OverIndicatorRule cloudGreenInFuture = new OverIndicatorRule(lead1Future, lead2Future);
         OverIndicatorRule conversionLineAboveBaseLine = new OverIndicatorRule(conversionLine, baseLine);
         Rule laggingSpanAbovePastCloud = new OverIndicatorRule(laggingSpanAsk, lead1Past).and(new OverIndicatorRule(laggingSpanAsk, lead2Past));
+        Rule priceAboveTheCloud = new OverIndicatorRule(result.askPriceIndicator, currentCloudUpperLine);
 
 
         BooleanIndicatorRule trueInBuyPhases = new BooleanIndicatorRule(new TrueInBuyPhaseIndicator(series, breakEvenIndicator));
@@ -432,7 +458,7 @@ public class IntelligentTa4jBenchmarks {
         Rule resetLowerCrossUpOn = crossTheCurrentCloudLowerDown
                 .or(trueInBuyPhases);
 
-        Rule crossingIndipendentIchimokuSignals = cloudGreenInFuture.and(conversionLineAboveBaseLine).and(laggingSpanAbovePastCloud);
+        Rule crossingIndipendentIchimokuSignals = priceAboveTheCloud.and(cloudGreenInFuture).and(conversionLineAboveBaseLine).and(laggingSpanAbovePastCloud);
         StrictBeforeRule crossUpperAndIchimokuSignals = new StrictBeforeRule(series, crossTheCurrentCloudUpperUp, crossingIndipendentIchimokuSignals, resetUpperCrossUpOn);
 
         StrictBeforeRule entryRule = new StrictBeforeRule(series, crossTheCurrentCloudLowerUp, crossUpperAndIchimokuSignals, resetLowerCrossUpOn);
@@ -831,6 +857,7 @@ public class IntelligentTa4jBenchmarks {
         private final LowPriceIndicator bidPriceIndicator;
         private final HighPriceIndicator askPriceIndicator;
         public Indicator<Num> currentCloudLowerLine;
+        public Indicator<Num> baseLine;
         private Rule entryRule;
 
 
