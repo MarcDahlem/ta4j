@@ -54,10 +54,24 @@ public class SellIndicator extends TradeBasedIndicator<Num> {
         return new SellIndicator(series, (buyIndex, index) -> new ConstantIndicator<>(series, breakEvenCalculator.getValue(buyIndex)));
     }
 
+    public static SellIndicator createClosepriceBreakEvenIndicator(BarSeries series, BigDecimal buyFee, BigDecimal sellFee) {
+        BigDecimal buyFeeFactor = BigDecimal.ONE.add(buyFee);
+        BigDecimal sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
+        TransformIndicator breakEvenCalculator = TransformIndicator.divide(TransformIndicator.multiply(new ClosePriceIndicator(series), buyFeeFactor), sellFeeFactor);
+        return new SellIndicator(series, (buyIndex, index) -> new ConstantIndicator<>(series, breakEvenCalculator.getValue(buyIndex)));
+    }
+
     public static SellIndicator createSellLimitIndicator(BarSeries series, BigDecimal limitPercentageUnderCurrentBid, SellIndicator tradeKnowingIndicator) {
         LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
         BigDecimal limitScaleFactor = BigDecimal.ONE.subtract(limitPercentageUnderCurrentBid);
         TransformIndicator sellLimitCalculator = TransformIndicator.multiply(bidPriceIndicator, limitScaleFactor);
+        return new SellIndicator(series, tradeKnowingIndicator, (buyIndex, index) -> new HighestValueIndicator(sellLimitCalculator, index - buyIndex + 1));
+    }
+
+    public static SellIndicator createClosepriceSellLimitIndicator(BarSeries series, BigDecimal limitPercentageUnderCurrentBid, SellIndicator tradeKnowingIndicator) {
+        ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
+        BigDecimal limitScaleFactor = BigDecimal.ONE.subtract(limitPercentageUnderCurrentBid);
+        TransformIndicator sellLimitCalculator = TransformIndicator.multiply(closePriceIndicator, limitScaleFactor);
         return new SellIndicator(series, tradeKnowingIndicator, (buyIndex, index) -> new HighestValueIndicator(sellLimitCalculator, index - buyIndex + 1));
     }
 
