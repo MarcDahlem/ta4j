@@ -420,7 +420,7 @@ public class IntelligentTa4jOhlcBenchmarks {
             String benchmarkName,
             Function<Integer, Function<Integer, Function<BarSeries, StrategyCreationResult>>> strategyCreator
     ) {
-        Queue<StrategyBenchmarkConfiguration> strategies = new LinkedList<>();
+        List<StrategyBenchmarkConfiguration> strategies = new LinkedList<>();
 
         for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
@@ -432,7 +432,7 @@ public class IntelligentTa4jOhlcBenchmarks {
                     BaseStrategy strategy = new BaseStrategy(series.getName() + "_" + currentStrategyName, creationResult.getEntryRule(), creationResult.getExitRule());
                     strategiesForTheSeries.add(new StrategyConfiguration(strategy, series, creationResult.getBreakEvenIndicator()));
                 }
-                strategies.offer(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
+                strategies.add(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
             }
         }
 
@@ -514,7 +514,7 @@ public class IntelligentTa4jOhlcBenchmarks {
             String benchmarkName,
             Function<Integer, Function<Integer, Function<Integer, Function<Integer, Function<BarSeries, StrategyCreationResult>>>>> strategyCreator
     ) {
-        Queue<StrategyBenchmarkConfiguration> strategies = new LinkedList<>();
+        List<StrategyBenchmarkConfiguration> strategies = new LinkedList<>();
 
         for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
@@ -532,7 +532,7 @@ public class IntelligentTa4jOhlcBenchmarks {
                             BaseStrategy strategy = new BaseStrategy(series.getName() + "_" + currentStrategyName, creationResult.getEntryRule(), creationResult.getExitRule());
                             strategiesForTheSeries.add(new StrategyConfiguration(strategy, series, creationResult.getBreakEvenIndicator()));
                         }
-                        strategies.offer(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
+                        strategies.add(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
                     }
                 }
             }
@@ -547,7 +547,7 @@ public class IntelligentTa4jOhlcBenchmarks {
             String benchmarkName,
             Function<Integer, Function<Integer, Function<BigDecimal, Function<BigDecimal, Function<BigDecimal, Function<BigDecimal, Function<BarSeries, StrategyCreationResult>>>>>>> strategyCreator
     ) {
-        Queue<StrategyBenchmarkConfiguration> strategies = new LinkedList<>();
+        List<StrategyBenchmarkConfiguration> strategies = new LinkedList<>();
 
         for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
@@ -569,7 +569,7 @@ public class IntelligentTa4jOhlcBenchmarks {
                                     BaseStrategy strategy = new BaseStrategy(series.getName() + "_" + currentStrategyName, creationResult.getEntryRule(), creationResult.getExitRule());
                                     strategiesForTheSeries.add(new StrategyConfiguration(strategy, series, creationResult.getBreakEvenIndicator()));
                                 }
-                                strategies.offer(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
+                                strategies.add(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
                             }
                         }
                     }
@@ -582,7 +582,7 @@ public class IntelligentTa4jOhlcBenchmarks {
         printAndSaveResults(result, "_" + benchmarkName + "_", null);
     }
 
-    private List<TradingStatement> simulateStrategies(Queue<StrategyBenchmarkConfiguration> benchmarkConfigurations) {
+    private List<TradingStatement> simulateStrategies(List<StrategyBenchmarkConfiguration> benchmarkConfigurations) {
         List<TradingStatement> result = new LinkedList<>();
         int counter = 0;
         int originalSize = benchmarkConfigurations.size();
@@ -590,7 +590,7 @@ public class IntelligentTa4jOhlcBenchmarks {
             counter++;
             LOG.info("Executing ta4j configurations " + counter + "/" + originalSize);
 
-            StrategyBenchmarkConfiguration strats = benchmarkConfigurations.poll();
+            StrategyBenchmarkConfiguration strats = benchmarkConfigurations.get(counter-1);
             Map<TradingStatement, BarSeries> currentSeriesResult = new HashMap<>();
 
             int amountStrategies = strats.list.size();
