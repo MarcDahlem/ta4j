@@ -606,7 +606,7 @@ public class IntelligentTa4jOhlcBenchmarks {
                     throw new IllegalStateException("Put only 1 Strategy. Why mutliple results?");
                 }
                 currentSeriesResult.put(tradingStatement.get(0), entry.series);
-                entry.strategy.destroy();
+                //entry.strategy.destroy();
             }
             result.add(combineTradingStatements(currentSeriesResult, strats.name));
             if (counter % 2 == 0) {

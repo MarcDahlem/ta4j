@@ -15,7 +15,7 @@ public class TripleKeltnerChannelMiddleIndicator extends KeltnerChannelMiddleInd
 
 
     @Override
-    protected Num calculate(int index) {
+    public Num getValue(int index) {
         return this.tripleEmaIndicator.getValue(index);
     }
 }

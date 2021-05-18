@@ -7,6 +7,12 @@ Changelog for `ta4j`, roughly following [keepachangelog.com](http://keepachangel
 ### Fixed
 
 ### Changed
+- **KeltnerChannelMiddleIndicator** changed superclass to AbstractIndicator; add GetBarCount() and toString()
+- **KeltnerChannelUpperIndicator** changed superclass to AbstractIndicator; add constructor to accept pre-constructed ATR; add GetBarCount() and toString()
+- **KeltnerChannelLowerIndicator** changed superclass to AbstractIndicator; add constructor to accept pre-constructed ATR; add GetBarCount() and toString()
+- **BarSeriesManager** removed empty args constructor
+- **Open|High|Low|Close** do not cache price values anymore
+- **DifferenceIndicator(i1,i2)** replaced by the more flexible CombineIndicator.minus(i1,i2)
 
 ### Removed/Deprecated
 
@@ -93,9 +99,6 @@ Changelog for `ta4j`, roughly following [keepachangelog.com](http://keepachangel
 - :tada: **Enhancement** added **`GrossLossCriterion.class`**.
 - :tada: **Enhancement** added **`NetProfitCriterion.class`**.
 - :tada: **Enhancement** added chooseBest() method with parameter tradeType in AnalysisCriterion.
-<<<<<<< HEAD
-- **Example** added a json serialization and deserialization example of BarSeries
-=======
 - :tada: **Enhancement** added **`AverageLossCriterion.class`**.
 - :tada: **Enhancement** added **`AverageProfitCriterion.class`**.
 - :tada: **Enhancement** added **`ProfitLossRatioCriterion.class`**.
@@ -105,7 +108,6 @@ Changelog for `ta4j`, roughly following [keepachangelog.com](http://keepachangel
 - :tada: **Enhancement** added Position#hasProfit.
 - :tada: **Enhancement** added Position#hasLoss.
 - :tada: **Enhancement** exposed both EMAs in MACD indicator
->>>>>>> origin/feature/enhance-backtest-executor
 
 
 ## 0.13 (released November 5, 2019)
