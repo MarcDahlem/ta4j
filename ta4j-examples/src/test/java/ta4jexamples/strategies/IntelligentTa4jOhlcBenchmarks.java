@@ -60,7 +60,9 @@ import org.ta4j.core.Trade;
 import org.ta4j.core.cost.LinearTransactionCostModel;
 import org.ta4j.core.cost.ZeroCostModel;
 import org.ta4j.core.indicators.EMAIndicator;
+import org.ta4j.core.indicators.MACDIndicator;
 import org.ta4j.core.indicators.SellIndicator;
+import org.ta4j.core.indicators.StochasticOscillatorKIndicator;
 import org.ta4j.core.indicators.UnstableIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.ConstantIndicator;
@@ -124,7 +126,7 @@ public class IntelligentTa4jOhlcBenchmarks {
         //upPercentage = 10;
         upPercentage = 1.309;
         //lookback_max = 11;
-        lookback_max = 1000;
+        lookback_max = 200;
 
         upPercentageBig = new BigDecimal(upPercentage);
 
@@ -365,25 +367,25 @@ public class IntelligentTa4jOhlcBenchmarks {
                 i -> j -> k -> l -> series -> {
                     ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
 
-                    //StochasticOscillatorKIndicator stochasticOscillaltorK = new StochasticOscillatorKIndicator(series, 140);
-                    //MACDIndicator macd = new MACDIndicator(closePriceIndicator, 90, 260);
-                    //EMAIndicator emaMacd = new EMAIndicator(macd, 180);
+                    StochasticOscillatorKIndicator stochasticOscillaltorK = new StochasticOscillatorKIndicator(series, k);
+                    MACDIndicator macd = new MACDIndicator(closePriceIndicator, j, i);
+                    EMAIndicator emaMacd = new EMAIndicator(macd, l);
 
 
                     EMAIndicator buyIndicatorLong = new EMAIndicator(closePriceIndicator, Math.toIntExact(i));
-                    TransformIndicator buyIndicatorShort = TransformIndicator.multiply(new EMAIndicator(closePriceIndicator, Math.toIntExact(j)), sellFeeFactor);
+                    Indicator<Num> buyIndicatorShort = new EMAIndicator(closePriceIndicator, Math.toIntExact(j));
 
-                    EMAIndicator sellIndicatorLong = new EMAIndicator(closePriceIndicator, Math.toIntExact(k));
-                    TransformIndicator sellIndicatorShort = TransformIndicator.multiply(new EMAIndicator(closePriceIndicator, Math.toIntExact(l)), buyFeeFactor);
+                    EMAIndicator sellIndicatorLong = new EMAIndicator(closePriceIndicator, Math.toIntExact(i));
+                    Indicator<Num> sellIndicatorShort = new EMAIndicator(closePriceIndicator, Math.toIntExact(j));
 
-                    Rule entryRule = new CrossedUpIndicatorRule(buyIndicatorShort, buyIndicatorLong) // Trend
-                            //.and(new UnderIndicatorRule(stochasticOscillaltorK, 20)) // Signal 1
-                            //.and(new OverIndicatorRule(macd, emaMacd)); // Signal 2
+                    Rule entryRule = new OverIndicatorRule(buyIndicatorShort, buyIndicatorLong) // Trend
+                            .and(new CrossedDownIndicatorRule(stochasticOscillaltorK, 20)) // Signal 1
+                            .and(new OverIndicatorRule(macd, emaMacd)); // Signal 2
                             ;
 
-                    Rule exitRule = new CrossedDownIndicatorRule(sellIndicatorShort, sellIndicatorLong) // Trend
-                            //.and(new OverIndicatorRule(stochasticOscillaltorK, 80)) // Signal 1
-                            //.and(new UnderIndicatorRule(macd, emaMacd)); // Signal 2
+                    Rule exitRule = new UnderIndicatorRule(sellIndicatorShort, sellIndicatorLong) // Trend
+                            .and(new CrossedUpIndicatorRule(stochasticOscillaltorK, 80)) // Signal 1
+                            .and(new UnderIndicatorRule(macd, emaMacd)); // Signal 2
                             ;
                     return new StrategyCreationResult(entryRule, exitRule, null);
                 });
@@ -421,7 +423,7 @@ public class IntelligentTa4jOhlcBenchmarks {
         Queue<StrategyBenchmarkConfiguration> strategies = new LinkedList<>();
 
         for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
-            for (long j = 1; j < lookback_max; j = Math.round(Math.ceil(j * upPercentage))) {
+            for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
                 String currentStrategyName = "i(" + i + "), j(" + j + ")";
                 LOG.info(currentStrategyName);
                 List<StrategyConfiguration> strategiesForTheSeries = new LinkedList<>();
@@ -516,8 +518,8 @@ public class IntelligentTa4jOhlcBenchmarks {
 
         for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
-                for (long k = 26; k < lookback_max; k = Math.round(Math.ceil(k * upPercentage))) {
-                    for (long l = 9; l < k; l = Math.round(Math.ceil(l * upPercentage))) {
+                for (long k = 1; k < lookback_max; k = Math.round(Math.ceil(k * upPercentage))) {
+                    for (long l = 1; l < lookback_max; l = Math.round(Math.ceil(l * upPercentage))) {
                         String currentStrategyName = "i(" + i + "), j(" + j + "), k(" + k + "),l(" + l + ")";
                         LOG.info(currentStrategyName);
                         List<StrategyConfiguration> strategiesForTheSeries = new LinkedList<>();
