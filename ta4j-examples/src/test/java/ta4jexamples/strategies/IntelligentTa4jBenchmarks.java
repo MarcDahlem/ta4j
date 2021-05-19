@@ -796,7 +796,7 @@ public class IntelligentTa4jBenchmarks {
 
             //if (false) throw new IOException("never thrown");
             //else LOG.debug("Gson writing disabled");
-            writer = new FileWriter("Benchmarks_" + suffix + ".json");
+            writer = new FileWriter("benchmarkResults/Benchmarks_" + suffix + ".json");
             gson.toJson(results, writer);
         } catch (IOException e) {
             e.printStackTrace();
