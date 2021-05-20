@@ -130,7 +130,7 @@ public class IntelligentTa4jOhlcBenchmarks {
 
         upPercentageBig = new BigDecimal(upPercentage);
 
-        percentageUpperBound = new BigDecimal("0.001");
+        //percentageUpperBound = new BigDecimal("0.001");
         percentageUpperBound = new BigDecimal("0.1");
 
     }
@@ -284,8 +284,8 @@ public class IntelligentTa4jOhlcBenchmarks {
     }
 
     @Test
-    public void benchmarkIchimokuTrailingTa4j() {
-        runBenchmarkForTwoVariables("IchimokuTrailing",
+    public void benchmarkIchimokuTrailingFixedTa4j() {
+        runBenchmarkForTwoVariables("IchimokuTrailingFixed",
                 i -> j -> series -> {
                     SellIndicator breakEvenIndicator = SellIndicator.createClosepriceBreakEvenIndicator(series, buyFee, sellFee);
                     IchimokuRules ichimokuRules = createIchimokuBuyRule(series, i, j, breakEvenIndicator);
@@ -299,6 +299,19 @@ public class IntelligentTa4jOhlcBenchmarks {
                     IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
                     UnderIndicatorRule exitRule = new UnderIndicatorRule(ichimokuRules.closePriceIndicator, intelligentTrailIndicator);
                     return new StrategyCreationResult(entryRule, exitRule, breakEvenIndicator);
+                }
+        );
+    }
+
+    @Test
+    public void benchmarkIchimokuTrailingFlexibleTa4j() {
+        runBenchmarkForTwoVariablesWithTrailingStopLoss("IchimokuTrailingFlexible",
+                i -> j -> intelligentTrailIndicator -> series -> {
+                    IchimokuRules ichimokuRules = createIchimokuBuyRule(series, i, j, intelligentTrailIndicator.getBreakEvenIndicator());
+                    Rule entryRule = ichimokuRules.getEntryRule();
+
+                    UnderIndicatorRule exitRule = new UnderIndicatorRule(ichimokuRules.closePriceIndicator, intelligentTrailIndicator);
+                    return new StrategyCreationResult(entryRule, exitRule, intelligentTrailIndicator.getBreakEvenIndicator());
                 }
         );
     }
@@ -505,7 +518,7 @@ public class IntelligentTa4jOhlcBenchmarks {
         printAndSaveResults(result, "_" + benchmarkName + "_", null);
     }
 
-    private IchimokuRules createIchimokuBuyRule(BarSeries series, int ICHIMOKU_LONG_SPAN, int ICHIMOKU_SHORT_SPAN, SellIndicator breakEvenIndicator) {
+    private IchimokuRules createIchimokuBuyRule(BarSeries series, int ICHIMOKU_LONG_SPAN, int ICHIMOKU_SHORT_SPAN, Indicator<Num> breakEvenIndicator) {
         IchimokuRules result = new IchimokuRules(series);
         IchimokuTenkanSenIndicator conversionLine = new IchimokuTenkanSenIndicator(series, ICHIMOKU_SHORT_SPAN); //9
         IchimokuKijunSenIndicator baseLine = new IchimokuKijunSenIndicator(series, ICHIMOKU_LONG_SPAN); //26
@@ -582,6 +595,48 @@ public class IntelligentTa4jOhlcBenchmarks {
                             strategiesForTheSeries.add(new StrategyConfiguration(strategy, series, creationResult.getBreakEvenIndicator()));
                         }
                         strategies.offer(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
+                    }
+                }
+            }
+        }
+
+        List<TradingStatement> result = simulateStrategies(strategies);
+        sortResultsByProfit(result);
+        printAndSaveResults(result, "_" + benchmarkName + "_", null);
+    }
+
+    private void runBenchmarkForTwoVariablesWithTrailingStopLoss(
+            String benchmarkName,
+            Function<Integer, Function<Integer, Function<IntelligentTrailIndicator, Function<BarSeries, StrategyCreationResult>>>> strategyCreator
+    ) {
+        Queue<StrategyBenchmarkConfiguration> strategies = new LinkedList<>();
+
+        for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
+            for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
+                for (BigDecimal below = new BigDecimal("0.001"); below.compareTo(percentageUpperBound) <= 0; below = below.multiply(upPercentageBig)) {
+                    for (BigDecimal above = new BigDecimal("0.001"); above.compareTo(percentageUpperBound) <= 0; above = above.multiply(upPercentageBig)) {
+                        for (BigDecimal minAbove = new BigDecimal("0.001"); minAbove.compareTo(above) <= 0; minAbove = minAbove.multiply(upPercentageBig)) {
+                            String currentStrategyName = "i(" + i + "), j(" + j + "), below(" + DECIMAL_FORMAT.format(below) + "), above(" + DECIMAL_FORMAT.format(above) + "), minAbove(" + DECIMAL_FORMAT.format(minAbove) + ")";
+                            LOG.info(currentStrategyName);
+                            List<StrategyConfiguration> strategiesForTheSeries = new LinkedList<>();
+                            for (BarSeries series : allSeries) {
+                                SellIndicator breakEvenIndicator = SellIndicator.createClosepriceBreakEvenIndicator(series, buyFee, sellFee);
+
+                                Indicator<Num> belowBreakEvenIndicator = SellIndicator.createClosepriceSellLimitIndicator(series, below, breakEvenIndicator);
+                                Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createClosepriceSellLimitIndicator(series, above, breakEvenIndicator);
+                                Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, minAbove, breakEvenIndicator);
+
+                                IntelligentTrailIndicator intelligentTrailIndicator = new IntelligentTrailIndicator(belowBreakEvenIndicator, aboveBreakEvenIndicator, minAboveBreakEvenIndicator, breakEvenIndicator);
+
+                                StrategyCreationResult creationResult = strategyCreator.apply(Math.toIntExact(i))
+                                        .apply(Math.toIntExact(j))
+                                        .apply(intelligentTrailIndicator)
+                                        .apply(series);
+                                BaseStrategy strategy = new BaseStrategy(series.getName() + "_" + currentStrategyName, creationResult.getEntryRule(), creationResult.getExitRule());
+                                strategiesForTheSeries.add(new StrategyConfiguration(strategy, series, creationResult.getBreakEvenIndicator()));
+                            }
+                            strategies.offer(new StrategyBenchmarkConfiguration(strategiesForTheSeries, currentStrategyName));
+                        }
                     }
                 }
             }
@@ -849,10 +904,9 @@ public class IntelligentTa4jOhlcBenchmarks {
         Gson gson = new GsonBuilder().registerTypeAdapter(Strategy.class, strategySerializer).registerTypeAdapter(Num.class, numSerializer).setPrettyPrinting().create();
         FileWriter writer = null;
         try {
-
-            //if (false) throw new IOException("never thrown");
-            //else LOG.debug("Gson writing disabled");
             writer = new FileWriter("benchmarkResults/OHLC_Benchmarks_" + suffix + "_15min.json");
+            //writer = new FileWriter("benchmarkResults/OHLC_Benchmarks_" + suffix + "_5min.json");
+            //writer = new FileWriter("benchmarkResults/OHLC_Benchmarks_" + suffix + "_1min.json");
             gson.toJson(results, writer);
         } catch (IOException e) {
             e.printStackTrace();

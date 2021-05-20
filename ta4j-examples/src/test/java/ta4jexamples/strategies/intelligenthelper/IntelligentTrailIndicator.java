@@ -2,15 +2,16 @@ package ta4jexamples.strategies.intelligenthelper;
 
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.CachedIndicator;
+import org.ta4j.core.indicators.SellIndicator;
 import org.ta4j.core.num.Num;
 
 public class IntelligentTrailIndicator extends CachedIndicator<Num> {
     private final Indicator<Num> aboveBreakEvenIndicator;
     private final Indicator<Num> minAboveBreakEvenIndicator;
-    private final Indicator<Num> breakEvenIndicator;
+    private final SellIndicator breakEvenIndicator;
     private final Indicator<Num> belowBreakEvenIndicator;
 
-    public IntelligentTrailIndicator(Indicator<Num> belowBreakEvenIndicator, Indicator<Num> aboveBreakEvenIndicator, Indicator<Num> minAboveBreakEvenIndicator, Indicator<Num> breakEvenIndicator) {
+    public IntelligentTrailIndicator(Indicator<Num> belowBreakEvenIndicator, Indicator<Num> aboveBreakEvenIndicator, Indicator<Num> minAboveBreakEvenIndicator, SellIndicator breakEvenIndicator) {
         super(belowBreakEvenIndicator);
 
         this.belowBreakEvenIndicator = belowBreakEvenIndicator;
@@ -27,5 +28,9 @@ public class IntelligentTrailIndicator extends CachedIndicator<Num> {
             return minAboveBreakEvenIndicator.getValue(i).max(aboveBreakEvenIndicator.getValue(i));
         }
         return belowBreakEvenIndicator.getValue(i);
+    }
+
+    public SellIndicator getBreakEvenIndicator() {
+        return breakEvenIndicator;
     }
 }
