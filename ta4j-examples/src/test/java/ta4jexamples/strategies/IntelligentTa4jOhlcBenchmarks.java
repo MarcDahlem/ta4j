@@ -126,9 +126,9 @@ public class IntelligentTa4jOhlcBenchmarks {
         //upPercentage = 10;
         upPercentage = 1.309;
         //lookback_max = 11;
-        lookback_max = 800;
+        lookback_max = 200;
 
-        upPercentageBig = new BigDecimal(upPercentage);
+        upPercentageBig = new BigDecimal("1.618");
 
         //percentageUpperBound = new BigDecimal("0.001");
         percentageUpperBound = new BigDecimal("0.1");
@@ -163,11 +163,12 @@ public class IntelligentTa4jOhlcBenchmarks {
                     SellIndicator breakEvenIndicator = SellIndicator.createClosepriceBreakEvenIndicator(series, buyFee, sellFee);
                     IchimokuRules ichimokuRules = createIchimokuBuyRule(series, i, j, breakEvenIndicator);
 
-                    Rule entryRule = ichimokuRules.getEntryRule();
+                    UnstableIndicator delayedConversionLine = new UnstableIndicator(new DelayIndicator(ichimokuRules.conversionLine, i), i);
+                    Rule entryRule = ichimokuRules.getEntryRule().and(new OverIndicatorRule(ichimokuRules.laggingSpan, delayedConversionLine));
 
                     SellIndicator cloudLowerLineAtBuyPrice = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, ichimokuRules.currentCloudLowerLine.getValue(buyIndex)));
 
-                    UnstableIndicator delayedConversionLine = new UnstableIndicator(new DelayIndicator(ichimokuRules.conversionLine, i), i);
+
                     UnderIndicatorRule laggingSpanEmergencyStopReached = new UnderIndicatorRule(ichimokuRules.laggingSpan, delayedConversionLine);
                     UnderIndicatorRule stopLossReached = new UnderIndicatorRule(ichimokuRules.closePriceIndicator, cloudLowerLineAtBuyPrice);
 
@@ -185,11 +186,12 @@ public class IntelligentTa4jOhlcBenchmarks {
                     SellIndicator breakEvenIndicator = SellIndicator.createClosepriceBreakEvenIndicator(series, buyFee, sellFee);
                     IchimokuRules ichimokuRules = createIchimokuBuyRule(series, i, j, breakEvenIndicator);
 
-                    Rule entryRule = ichimokuRules.getEntryRule();
+                    UnstableIndicator delayedBaseline = new UnstableIndicator(new DelayIndicator(ichimokuRules.baseLine, i), i);
+                    Rule entryRule = ichimokuRules.getEntryRule().and(new OverIndicatorRule(ichimokuRules.laggingSpan, delayedBaseline));
 
                     SellIndicator cloudLowerLineAtBuyPrice = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, ichimokuRules.currentCloudLowerLine.getValue(buyIndex)));
 
-                    UnstableIndicator delayedBaseline = new UnstableIndicator(new DelayIndicator(ichimokuRules.baseLine, i), i);
+
                     UnderIndicatorRule laggingSpanEmergencyStopReached = new UnderIndicatorRule(ichimokuRules.laggingSpan, delayedBaseline);
                     UnderIndicatorRule stopLossReached = new UnderIndicatorRule(ichimokuRules.closePriceIndicator, cloudLowerLineAtBuyPrice);
 
@@ -713,8 +715,8 @@ public class IntelligentTa4jOhlcBenchmarks {
                 entry.strategy.destroy();
             }
             result.add(combineTradingStatements(currentSeriesResult, strats.name));
-            if (counter % 2 == 0) {
-                System.gc();
+            if (counter % 100 == 0) {
+                //System.gc();
             }
         }
         return result;
@@ -833,8 +835,8 @@ public class IntelligentTa4jOhlcBenchmarks {
             FilenameFilter filter = (f1, name) -> {
                 String fileName = name.toLowerCase(Locale.ROOT);
                 return fileName.endsWith(".json")
-                        //&& fileName.startsWith("5min")
                         && fileName.startsWith("15min")
+                        //&& fileName.startsWith("5min")
                         //&& !(fileName.startsWith("5min") || fileName.startsWith("15min") )
                         ;
             };
