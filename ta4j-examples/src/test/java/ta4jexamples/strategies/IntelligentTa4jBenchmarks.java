@@ -61,13 +61,11 @@ import org.ta4j.core.indicators.SellIndicator;
 import org.ta4j.core.indicators.UnstableIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.ConstantIndicator;
-import org.ta4j.core.indicators.helpers.DifferencePercentage;
 import org.ta4j.core.indicators.helpers.HighPriceIndicator;
 import org.ta4j.core.indicators.helpers.LowPriceIndicator;
 import org.ta4j.core.indicators.helpers.LowestValueIndicator;
 import org.ta4j.core.indicators.helpers.TransformIndicator;
 import org.ta4j.core.indicators.ichimoku.IchimokuKijunSenIndicator;
-import org.ta4j.core.indicators.ichimoku.IchimokuLineIndicator;
 import org.ta4j.core.indicators.ichimoku.IchimokuTenkanSenIndicator;
 import org.ta4j.core.indicators.keltner.KeltnerChannelLowerIndicator;
 import org.ta4j.core.indicators.keltner.KeltnerChannelMiddleIndicator;
@@ -82,8 +80,6 @@ import org.ta4j.core.rules.CrossedDownIndicatorRule;
 import org.ta4j.core.rules.CrossedUpIndicatorRule;
 import org.ta4j.core.rules.FixedRule;
 import org.ta4j.core.rules.OverIndicatorRule;
-import org.ta4j.core.rules.StopGainRule;
-import org.ta4j.core.rules.StopLossRule;
 import org.ta4j.core.rules.StrictBeforeRule;
 import org.ta4j.core.rules.UnderIndicatorRule;
 
@@ -99,15 +95,15 @@ import ta4jexamples.strategies.intelligenthelper.IchimokuLead2FutureIndicator;
 import ta4jexamples.strategies.intelligenthelper.IntelligentTrailIndicator;
 import ta4jexamples.strategies.intelligenthelper.DelayIndicator;
 import ta4jexamples.strategies.intelligenthelper.TripleKeltnerChannelMiddleIndicator;
-import ta4jexamples.strategies.intelligenthelper.TrueInBuyPhaseIndicator;
+import ta4jexamples.strategies.intelligenthelper.TrueWhileInMarketIndicator;
 
 public class IntelligentTa4jBenchmarks {
 
     private static final Logger LOG = LoggerFactory.getLogger(IntelligentTa4jBenchmarks.class);
     private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("#.########");
     private Set<BarSeries> allSeries;
-    private BigDecimal buyFee;
-    private BigDecimal sellFee;
+    private BigDecimal enterFee;
+    private BigDecimal exitFee;
     private double upPercentage;
     private int lookback_max;
     private BigDecimal buyFeeFactor;
@@ -119,10 +115,10 @@ public class IntelligentTa4jBenchmarks {
     public void setupTests() {
         allSeries = loadSeries();
 
-        buyFee = new BigDecimal("0.0026");
-        sellFee = new BigDecimal("0.0026");
-        buyFeeFactor = BigDecimal.ONE.add(buyFee);
-        sellFeeFactor = BigDecimal.ONE.subtract(sellFee);
+        enterFee = new BigDecimal("0.0026");
+        exitFee = new BigDecimal("0.0026");
+        buyFeeFactor = BigDecimal.ONE.add(enterFee);
+        sellFeeFactor = BigDecimal.ONE.subtract(exitFee);
 
         //upPercentage = 10;
         upPercentage = 1.309;
@@ -140,7 +136,7 @@ public class IntelligentTa4jBenchmarks {
     public void benchmarkIchimokuStopLossOrLaggingCrossTa4j() {
         runBenchmarkForTwoVariables("IchimokuStopLossOrLaggingCross",
                 i -> j -> series -> {
-                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, enterFee, exitFee);
                     IchimokuRules ichimokuRules = createIchimokuBuyRule(series, i, j, breakEvenIndicator);
 
                     Rule entryRule = ichimokuRules.getEntryRule();
@@ -162,7 +158,7 @@ public class IntelligentTa4jBenchmarks {
     public void benchmarkIchimokuStopLossOrGainWithoutLaggingSpanTa4j() {
         runBenchmarkForTwoVariables("IchimokuStopLossOrGainWithoutLaggingSpan",
                 i -> j -> series -> {
-                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, enterFee, exitFee);
                     IchimokuRules ichimokuRules = createIchimokuBuyRule(series, i, j, breakEvenIndicator);
 
                     Rule entryRule = ichimokuRules.getEntryRule();
@@ -192,7 +188,7 @@ public class IntelligentTa4jBenchmarks {
     public void benchmarkIchimokuStopLossOrGainTa4j() {
         runBenchmarkForTwoVariables("IchimokuStopLossOrGain",
                 i -> j -> series -> {
-                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, enterFee, exitFee);
                     IchimokuRules ichimokuRules = createIchimokuBuyRule(series, i, j, breakEvenIndicator);
 
                     Rule entryRule = ichimokuRules.getEntryRule();
@@ -224,7 +220,7 @@ public class IntelligentTa4jBenchmarks {
     public void benchmarkIchimokuTrailingTa4j() {
         runBenchmarkForTwoVariables("IchimokuTrailing",
                 i -> j -> series -> {
-                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, enterFee, exitFee);
                     IchimokuRules ichimokuRules = createIchimokuBuyRule(series, i, j, breakEvenIndicator);
                     Rule entryRule = ichimokuRules.getEntryRule();
 
@@ -248,7 +244,7 @@ public class IntelligentTa4jBenchmarks {
 
                     Rule entryRule = new OverIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerHigh);
 
-                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, enterFee, exitFee);
                     Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
                     Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.02"), breakEvenIndicator);
                     Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
@@ -268,7 +264,7 @@ public class IntelligentTa4jBenchmarks {
 
                     Rule entryRule = new OverIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerHigh);
 
-                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, enterFee, exitFee);
                     Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
                     Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.02"), breakEvenIndicator);
                     Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
@@ -289,7 +285,7 @@ public class IntelligentTa4jBenchmarks {
 
                     Rule entryRule = new UnderIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerLow).or(new OverIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerHigh));
 
-                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, enterFee, exitFee);
                     Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
                     Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.02"), breakEvenIndicator);
                     Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
@@ -309,7 +305,7 @@ public class IntelligentTa4jBenchmarks {
 
                     Rule entryRule = new UnderIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerLow).or(new OverIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerHigh));
 
-                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, enterFee, exitFee);
                     Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
                     Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.02"), breakEvenIndicator);
                     Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
@@ -329,7 +325,7 @@ public class IntelligentTa4jBenchmarks {
 
                     Rule entryRule = new UnderIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerLow);
 
-                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, enterFee, exitFee);
                     Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
                     Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.02"), breakEvenIndicator);
                     Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
@@ -350,7 +346,7 @@ public class IntelligentTa4jBenchmarks {
 
                     Rule entryRule = new UnderIndicatorRule(keltnerRules.askPriceIndicator, keltnerRules.keltnerLow);
 
-                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, enterFee, exitFee);
                     Indicator<Num> belowBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.07"), breakEvenIndicator);
                     Indicator<Num> aboveBreakEvenIndicator = SellIndicator.createSellLimitIndicator(series, new BigDecimal("0.02"), breakEvenIndicator);
                     Indicator<Num> minAboveBreakEvenIndicator = createMinAboveBreakEvenIndicator(series, new BigDecimal("0.01"), breakEvenIndicator);
@@ -405,7 +401,7 @@ public class IntelligentTa4jBenchmarks {
                     LowestValueIndicator buyShortIndicator = new LowestValueIndicator(askPriceIndicator, Math.toIntExact(j));
                     TransformIndicator buyGainLine = TransformIndicator.multiply(buyLongIndicator, BigDecimal.ONE.add(k));
 
-                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, buyFee, sellFee);
+                    SellIndicator breakEvenIndicator = SellIndicator.createBreakEvenIndicator(series, enterFee, exitFee);
 
                     OverIndicatorRule entryRule = new OverIndicatorRule(buyShortIndicator, buyGainLine);
 
@@ -479,7 +475,7 @@ public class IntelligentTa4jBenchmarks {
         Rule priceAboveTheCloud = new OverIndicatorRule(result.bidPriceIndicator, currentCloudUpperLine);
 
 
-        BooleanIndicatorRule trueInBuyPhases = new BooleanIndicatorRule(new TrueInBuyPhaseIndicator(series, breakEvenIndicator));
+        BooleanIndicatorRule trueInBuyPhases = new BooleanIndicatorRule(new TrueWhileInMarketIndicator(series, breakEvenIndicator));
 
         Rule resetUpperCrossUpOn = crossTheCurrentCloudUpperDown
                 .or(trueInBuyPhases);

@@ -3,8 +3,8 @@ package ta4jexamples.strategies.intelligenthelper;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.indicators.TradeBasedIndicator;
 
-public class TrueInBuyPhaseIndicator extends TradeBasedIndicator<Boolean> {
-    public TrueInBuyPhaseIndicator(BarSeries series, TradeBasedIndicator<?> tradeKnowingIndicator) {
+public class TrueWhileInMarketIndicator extends TradeBasedIndicator<Boolean> {
+    public TrueWhileInMarketIndicator(BarSeries series, TradeBasedIndicator<?> tradeKnowingIndicator) {
         super(series, tradeKnowingIndicator);
     }
 
