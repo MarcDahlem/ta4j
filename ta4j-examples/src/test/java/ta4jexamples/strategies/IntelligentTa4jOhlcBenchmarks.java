@@ -94,7 +94,9 @@ import ta4jexamples.strategies.intelligenthelper.DelayIndicator;
 import ta4jexamples.strategies.intelligenthelper.IchimokuLaggingSpanIndicator;
 import ta4jexamples.strategies.intelligenthelper.IchimokuLead1FutureIndicator;
 import ta4jexamples.strategies.intelligenthelper.IchimokuLead2FutureIndicator;
+import ta4jexamples.strategies.intelligenthelper.IntelligentJsonSeriesLoader;
 import ta4jexamples.strategies.intelligenthelper.IntelligentTrailIndicator;
+import ta4jexamples.strategies.intelligenthelper.JsonRecordingTimeInterval;
 import ta4jexamples.strategies.intelligenthelper.TripleKeltnerChannelMiddleIndicator;
 
 public class IntelligentTa4jOhlcBenchmarks {
@@ -110,9 +112,11 @@ public class IntelligentTa4jOhlcBenchmarks {
     private BigDecimal exitFeeFactor;
     private BigDecimal upPercentageBig;
     private BigDecimal percentageUpperBound;
+    private JsonRecordingTimeInterval interval;
 
     @Before
     public void setupTests() {
+        interval = JsonRecordingTimeInterval.FifteenMinutes;
         allSeries = loadSeries();
 
         enterFee = new BigDecimal("0.0026");
@@ -825,25 +829,8 @@ public class IntelligentTa4jOhlcBenchmarks {
         folders.add("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketDataOhlc\\");
         folders.add("D:\\Documents\\Programmierung\\bxbot\\recordedMarketDataOhlc\\");
 
-        Set<BarSeries> result = new HashSet<>();
-        for (String folder : folders) {
-            File f = new File(folder);
-
-            FilenameFilter filter = (f1, name) -> {
-                String fileName = name.toLowerCase(Locale.ROOT);
-                return fileName.endsWith(".json")
-                        && fileName.startsWith("15min")
-                        //&& fileName.startsWith("5min")
-                        //&& !(fileName.startsWith("5min") || fileName.startsWith("15min") )
-                        ;
-            };
-
-            String[] pathnames = f.list(filter);
-            for (String path : pathnames) {
-                result.add(JsonBarsSerializer.loadSeries(folder + File.separator + path));
-            }
-        }
-        return result;
+        IntelligentJsonSeriesLoader jsonLoader = new IntelligentJsonSeriesLoader(folders);
+        return jsonLoader.loadRecordingsIntoSeries(JsonRecordingTimeInterval.FifteenMinutes);
 
     }
 
@@ -901,11 +888,25 @@ public class IntelligentTa4jOhlcBenchmarks {
         JsonSerializer<Strategy> strategySerializer = (src, typeOfSrc, context) -> context.serialize(src.getName());
         JsonSerializer<Num> numSerializer = (src, typeOfSrc, context) -> context.serialize(src.getDelegate());
         Gson gson = new GsonBuilder().registerTypeAdapter(Strategy.class, strategySerializer).registerTypeAdapter(Num.class, numSerializer).setPrettyPrinting().create();
+        switch (interval) {
+            case All:
+                suffix =  suffix+"_all.json";
+                break;
+            case OneMinute:
+                suffix =  suffix+"_1min.json";
+                break;
+            case FiveMinutes:
+                suffix =  suffix+"_5min.json";
+                break;
+            case FifteenMinutes:
+                suffix =  suffix+"_15min.json";
+                break;
+            default:
+                throw new IllegalStateException("Unknown time interval " + interval);
+        }
         FileWriter writer = null;
         try {
-            writer = new FileWriter("benchmarkResults/OHLC_Benchmarks_" + suffix + "_15min.json");
-            //writer = new FileWriter("benchmarkResults/OHLC_Benchmarks_" + suffix + "_5min.json");
-            //writer = new FileWriter("benchmarkResults/OHLC_Benchmarks_" + suffix + "_1min.json");
+            writer = new FileWriter("benchmarkResults/OHLC_Benchmarks_" + suffix);
             gson.toJson(results, writer);
         } catch (IOException e) {
             e.printStackTrace();

@@ -92,8 +92,10 @@ import ta4jexamples.strategies.intelligenthelper.CombineIndicator;
 import ta4jexamples.strategies.intelligenthelper.IchimokuLaggingSpanIndicator;
 import ta4jexamples.strategies.intelligenthelper.IchimokuLead1FutureIndicator;
 import ta4jexamples.strategies.intelligenthelper.IchimokuLead2FutureIndicator;
+import ta4jexamples.strategies.intelligenthelper.IntelligentJsonSeriesLoader;
 import ta4jexamples.strategies.intelligenthelper.IntelligentTrailIndicator;
 import ta4jexamples.strategies.intelligenthelper.DelayIndicator;
+import ta4jexamples.strategies.intelligenthelper.JsonRecordingTimeInterval;
 import ta4jexamples.strategies.intelligenthelper.TripleKeltnerChannelMiddleIndicator;
 import ta4jexamples.strategies.intelligenthelper.TrueWhileInMarketIndicator;
 
@@ -110,9 +112,11 @@ public class IntelligentTa4jBenchmarks {
     private BigDecimal sellFeeFactor;
     private BigDecimal upPercentageBig;
     private BigDecimal percentageUpperBound;
+    private JsonRecordingTimeInterval interval;
 
     @Before
     public void setupTests() {
+        interval = JsonRecordingTimeInterval.All;
         allSeries = loadSeries();
 
         enterFee = new BigDecimal("0.0026");
@@ -718,19 +722,8 @@ public class IntelligentTa4jBenchmarks {
         folders.add("C:\\Users\\Marc\\Documents\\Programmierung\\bxbot-working\\recordedMarketData\\");
         folders.add("D:\\Documents\\Programmierung\\bxbot\\recordedMarketData\\");
 
-        Set<BarSeries> result = new HashSet<>();
-        for (String folder : folders) {
-            File f = new File(folder);
-
-            FilenameFilter filter = (f1, name) -> name.toLowerCase(Locale.ROOT).endsWith(".json");
-
-            String[] pathnames = f.list(filter);
-            for (String path : pathnames) {
-                result.add(JsonBarsSerializer.loadSeries(folder + File.separator + path));
-            }
-        }
-        return result;
-
+        IntelligentJsonSeriesLoader jsonLoader = new IntelligentJsonSeriesLoader(folders);
+        return jsonLoader.loadRecordingsIntoSeries(JsonRecordingTimeInterval.All);
     }
 
 
@@ -787,6 +780,22 @@ public class IntelligentTa4jBenchmarks {
         JsonSerializer<Strategy> strategySerializer = (src, typeOfSrc, context) -> context.serialize(src.getName());
         JsonSerializer<Num> numSerializer = (src, typeOfSrc, context) -> context.serialize(src.getDelegate());
         Gson gson = new GsonBuilder().registerTypeAdapter(Strategy.class, strategySerializer).registerTypeAdapter(Num.class, numSerializer).setPrettyPrinting().create();
+        switch (interval) {
+            case All:
+                suffix =  suffix+"_all.json";
+                break;
+            case OneMinute:
+                suffix =  suffix+"_1min.json";
+                break;
+            case FiveMinutes:
+                suffix =  suffix+"_5min.json";
+                break;
+            case FifteenMinutes:
+                suffix =  suffix+"_15min.json";
+                break;
+            default:
+                throw new IllegalStateException("Unknown time interval " + interval);
+        }
         FileWriter writer = null;
         try {
 
