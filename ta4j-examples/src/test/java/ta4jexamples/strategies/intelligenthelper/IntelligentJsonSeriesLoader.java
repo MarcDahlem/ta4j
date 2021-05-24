@@ -5,8 +5,11 @@ import java.io.FilenameFilter;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
+import org.ta4j.core.Bar;
 import org.ta4j.core.BarSeries;
 
 import ta4jexamples.loaders.JsonBarsSerializer;
@@ -27,11 +30,60 @@ public class IntelligentJsonSeriesLoader {
             FilenameFilter filter = getFilenameFilter(interval);
 
             String[] pathnames = f.list(filter);
+            BarSeries lastSeries = null;
             for (String path : pathnames) {
-                result.add(JsonBarsSerializer.loadSeries(folder + File.separator + path));
+                BarSeries newSeries = JsonBarsSerializer.loadSeries(folder + File.separator + path);
+                Optional<Integer> maybeMergeIndex = findMergeIndex(lastSeries, newSeries);
+                if (maybeMergeIndex.isPresent()) {
+                    lastSeries = mergeSeries(lastSeries, newSeries, maybeMergeIndex.get());
+                } else {
+                    if(lastSeries != null) {
+                        result.add(lastSeries);
+                    }
+                    lastSeries = newSeries;
+                }
+            }
+            if(Objects.nonNull(lastSeries)) {
+                result.add(lastSeries);
             }
         }
         return result;
+    }
+
+    private BarSeries mergeSeries(BarSeries lastSeries, BarSeries newSeries, Integer mergeIndex) {
+        Bar firstNewBar = newSeries.getBar(mergeIndex);
+        lastSeries.addBar(firstNewBar, true);
+
+        for (int index = mergeIndex+1; index<= newSeries.getEndIndex(); index++) {
+            lastSeries.addBar(newSeries.getBar(index));
+        }
+        return lastSeries;
+    }
+
+    private Optional<Integer> findMergeIndex(BarSeries lastSeries, BarSeries newSeries) {
+        if (Objects.isNull(lastSeries)) {
+            return Optional.empty();
+        }
+        if (!getNamePrefix(lastSeries).equalsIgnoreCase(getNamePrefix(newSeries))) {
+            return Optional.empty();
+        }
+
+        Bar lastSeriesLastBar = lastSeries.getLastBar();
+        for(int index = newSeries.getBeginIndex(); index<= newSeries.getEndIndex(); index++) {
+            Bar currentBarInNewSeries = newSeries.getBar(index);
+            if (currentBarInNewSeries.getBeginTime().equals(lastSeriesLastBar.getBeginTime())) {
+                return Optional.of(index);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private String getNamePrefix(BarSeries series) {
+        String[] split = series.getName().split("_");
+        if (split.length != 2) {
+            throw new IllegalArgumentException("No valid recorded series. Needs <name>_<timestamp> as series name");
+        }
+        return split[0];
     }
 
     private FilenameFilter getFilenameFilter(JsonRecordingTimeInterval interval) {

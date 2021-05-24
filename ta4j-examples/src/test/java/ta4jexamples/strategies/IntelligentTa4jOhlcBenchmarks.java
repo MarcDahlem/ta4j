@@ -116,7 +116,7 @@ public class IntelligentTa4jOhlcBenchmarks {
 
     @Before
     public void setupTests() {
-        interval = JsonRecordingTimeInterval.FifteenMinutes;
+        interval = JsonRecordingTimeInterval.FiveMinutes;
         allSeries = loadSeries();
 
         enterFee = new BigDecimal("0.0026");
@@ -830,7 +830,7 @@ public class IntelligentTa4jOhlcBenchmarks {
         folders.add("D:\\Documents\\Programmierung\\bxbot\\recordedMarketDataOhlc\\");
 
         IntelligentJsonSeriesLoader jsonLoader = new IntelligentJsonSeriesLoader(folders);
-        return jsonLoader.loadRecordingsIntoSeries(JsonRecordingTimeInterval.FifteenMinutes);
+        return jsonLoader.loadRecordingsIntoSeries(interval);
 
     }
 

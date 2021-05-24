@@ -723,7 +723,7 @@ public class IntelligentTa4jBenchmarks {
         folders.add("D:\\Documents\\Programmierung\\bxbot\\recordedMarketData\\");
 
         IntelligentJsonSeriesLoader jsonLoader = new IntelligentJsonSeriesLoader(folders);
-        return jsonLoader.loadRecordingsIntoSeries(JsonRecordingTimeInterval.All);
+        return jsonLoader.loadRecordingsIntoSeries(interval);
     }
 
 
