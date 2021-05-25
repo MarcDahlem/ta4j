@@ -119,8 +119,8 @@ public class IntelligentTa4jOhlcBenchmarks {
         interval = JsonRecordingTimeInterval.FiveMinutes;
         allSeries = loadSeries();
 
-        enterFee = new BigDecimal("0.0026");
-        exitFee = new BigDecimal("0.0026");
+        enterFee = new BigDecimal("0.0024");
+        exitFee = new BigDecimal("0.0024");
         enterFeeFactor = BigDecimal.ONE.add(enterFee);
         exitFeeFactor = BigDecimal.ONE.subtract(exitFee);
 
@@ -705,7 +705,7 @@ public class IntelligentTa4jOhlcBenchmarks {
             for (StrategyConfiguration entry : strats.list) {
                 strategyCounter++;
                 //LOG.info("  * Simulating strategy " + strategyCounter + "/" + amountStrategies);
-                BacktestExecutor bte = new BacktestExecutor(entry.series, new LinearTransactionCostModel(0.0026), new ZeroCostModel());
+                BacktestExecutor bte = new BacktestExecutor(entry.series, new LinearTransactionCostModel(0.0024), new ZeroCostModel());
                 Map<Strategy, SellIndicator> toBeExecuted = new HashMap<>();
                 toBeExecuted.put(entry.strategy, entry.breakEvenIndicator);
                 List<TradingStatement> tradingStatement = bte.execute(toBeExecuted, entry.series.numOf(25), Trade.TradeType.BUY);
