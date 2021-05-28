@@ -26,6 +26,7 @@ package ta4jexamples.loaders.jsonhelper;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BaseBarSeries;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -54,6 +55,8 @@ public class GsonBarData {
     public void addTo(BaseBarSeries barSeries) {
         Instant endTimeInstant = Instant.ofEpochMilli(endTime);
         ZonedDateTime endBarTime = ZonedDateTime.ofInstant(endTimeInstant, ZoneId.systemDefault());
-        barSeries.addBar(endBarTime, openPrice, highPrice, lowPrice, closePrice);
+        Number volumeToAdd = volume == null ? BigDecimal.ZERO : volume;
+        Number amountToAdd = amount == null ? BigDecimal.ZERO : amount;
+        barSeries.addBar(endBarTime, openPrice, highPrice, lowPrice, closePrice, volumeToAdd, amountToAdd);
     }
 }

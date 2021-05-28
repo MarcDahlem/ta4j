@@ -29,18 +29,14 @@ import static org.ta4j.core.indicators.helpers.TransformIndicator.plus;
 import static ta4jexamples.strategies.intelligenthelper.CombineIndicator.divide;
 import static ta4jexamples.strategies.intelligenthelper.CombineIndicator.multiply;
 
-import java.io.File;
 import java.io.FileWriter;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -88,7 +84,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSerializer;
 
-import ta4jexamples.loaders.JsonBarsSerializer;
 import ta4jexamples.strategies.intelligenthelper.CombineIndicator;
 import ta4jexamples.strategies.intelligenthelper.DelayIndicator;
 import ta4jexamples.strategies.intelligenthelper.IchimokuLaggingSpanIndicator;
@@ -127,9 +122,9 @@ public class IntelligentTa4jOhlcBenchmarks {
         //upPercentage = 10;
         upPercentage = 1.309;
         //lookback_max = 11;
-        lookback_max = 200;
+        lookback_max = 350;
 
-        upPercentageBig = new BigDecimal("1.618");
+        upPercentageBig = new BigDecimal("1.309");
 
         //percentageUpperBound = new BigDecimal("0.001");
         percentageUpperBound = new BigDecimal("0.1");
@@ -546,14 +541,14 @@ public class IntelligentTa4jOhlcBenchmarks {
 
         OverIndicatorRule cloudGreenInFuture = new OverIndicatorRule(lead1Future, lead2Future);
         Rule conversionLineCrossesBaseLine = new CrossedUpIndicatorRule(conversionLine, baseLine);
-        Rule conversionLineCrossOverCloud = new OverIndicatorRule(baseLine, currentCloudUpperLine).and(conversionLineCrossesBaseLine);
+        //Rule conversionLineCrossOverCloud = new OverIndicatorRule(baseLine, currentCloudUpperLine).and(conversionLineCrossesBaseLine);
         Rule laggingSpanAbovePastPrice = new OverIndicatorRule(result.laggingSpan, result.delayedMarketPrice);
         Rule priceAboveTheCloud = new OverIndicatorRule(result.closePriceIndicator, currentCloudUpperLine);
         Rule priceAboveConversionLine = new OverIndicatorRule(result.closePriceIndicator, result.conversionLine);
 
         Rule entryRule = priceAboveTheCloud
                 .and(cloudGreenInFuture)
-                .and(conversionLineCrossOverCloud)
+                .and(conversionLineCrossesBaseLine)
                 .and(laggingSpanAbovePastPrice)
                 .and(priceAboveConversionLine);
 
