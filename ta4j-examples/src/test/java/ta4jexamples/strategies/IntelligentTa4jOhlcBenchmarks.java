@@ -28,6 +28,8 @@ import static org.ta4j.core.indicators.helpers.TransformIndicator.multiply;
 import static org.ta4j.core.indicators.helpers.TransformIndicator.plus;
 import static ta4jexamples.strategies.intelligenthelper.CombineIndicator.divide;
 import static ta4jexamples.strategies.intelligenthelper.CombineIndicator.multiply;
+import static ta4jexamples.strategies.intelligenthelper.CombineIndicator.plus;
+import static ta4jexamples.strategies.intelligenthelper.CombineIndicator.minus;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -55,8 +57,12 @@ import org.ta4j.core.Strategy;
 import org.ta4j.core.Trade;
 import org.ta4j.core.cost.LinearTransactionCostModel;
 import org.ta4j.core.cost.ZeroCostModel;
+import org.ta4j.core.indicators.ATRIndicator;
+import org.ta4j.core.indicators.ChandelierExitLongIndicator;
+import org.ta4j.core.indicators.ChandelierExitShortIndicator;
 import org.ta4j.core.indicators.EMAIndicator;
 import org.ta4j.core.indicators.MACDIndicator;
+import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.SellIndicator;
 import org.ta4j.core.indicators.StochasticOscillatorKIndicator;
 import org.ta4j.core.indicators.UnstableIndicator;
@@ -86,12 +92,14 @@ import com.google.gson.JsonSerializer;
 
 import ta4jexamples.strategies.intelligenthelper.CombineIndicator;
 import ta4jexamples.strategies.intelligenthelper.DelayIndicator;
+import ta4jexamples.strategies.intelligenthelper.HighestPivotPointIndicator;
 import ta4jexamples.strategies.intelligenthelper.IchimokuLaggingSpanIndicator;
 import ta4jexamples.strategies.intelligenthelper.IchimokuLead1FutureIndicator;
 import ta4jexamples.strategies.intelligenthelper.IchimokuLead2FutureIndicator;
 import ta4jexamples.strategies.intelligenthelper.IntelligentJsonSeriesLoader;
 import ta4jexamples.strategies.intelligenthelper.IntelligentTrailIndicator;
 import ta4jexamples.strategies.intelligenthelper.JsonRecordingTimeInterval;
+import ta4jexamples.strategies.intelligenthelper.LowestPivotPointIndicator;
 import ta4jexamples.strategies.intelligenthelper.TripleKeltnerChannelMiddleIndicator;
 
 public class IntelligentTa4jOhlcBenchmarks {
@@ -122,13 +130,63 @@ public class IntelligentTa4jOhlcBenchmarks {
         //upPercentage = 10;
         upPercentage = 1.309;
         //lookback_max = 11;
-        lookback_max = 350;
+        lookback_max = 400;
 
         upPercentageBig = new BigDecimal("1.309");
 
         //percentageUpperBound = new BigDecimal("0.001");
         percentageUpperBound = new BigDecimal("0.1");
 
+    }
+
+    @Test
+    public void benchmarkHiddenConversionWithChandelierExitTa4j() {
+        runBenchmarkForFourVariables("HiddenConversionWithChandelierExit",
+                i -> j -> k -> l -> series -> {
+                    ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
+
+                    int pivotCalculationFrame = k;
+                    int chandelierExitMultiplier = l;
+
+                    EMAIndicator longEma = new EMAIndicator(closePriceIndicator, i);
+                    EMAIndicator shortEma = new EMAIndicator(closePriceIndicator, j);
+                    RSIIndicator rsi = new RSIIndicator(new ClosePriceIndicator(series), 14);
+
+                    HighestPivotPointIndicator highPivotPoints = new HighestPivotPointIndicator(series, pivotCalculationFrame);
+                    LowestPivotPointIndicator lowPivotPoints = new LowestPivotPointIndicator(series, pivotCalculationFrame);
+                    ATRIndicator trueRangeIndicator = new ATRIndicator(series, 14);
+                    TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
+                    CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
+                    CombineIndicator emaDownTrendLine = minus(longEma, trueRangeFactor);
+
+                    HighestPivotPointIndicator rsiAtHighPivotPoints = new HighestPivotPointIndicator(series, rsi, pivotCalculationFrame);
+                    LowestPivotPointIndicator rsiAtLowPivotPoints = new LowestPivotPointIndicator(series, rsi, pivotCalculationFrame);
+
+                    Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
+                    Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
+                    Rule lowPriceMovesUp = new OverIndicatorRule(lowPivotPoints, new DelayIndicator(lowPivotPoints, 1));
+                    Rule oversoldIndicatorMovesDown = new UnderIndicatorRule(rsiAtLowPivotPoints, new DelayIndicator(rsiAtLowPivotPoints, 1));
+
+                    Rule longEntryRule = upTrend.and(priceOverLongReversalArea).and(lowPriceMovesUp).and(oversoldIndicatorMovesDown);
+
+                    ChandelierExitLongIndicator chandelierExitLongIndicator = new ChandelierExitLongIndicator(series, 22, chandelierExitMultiplier);
+
+                    Rule longExitRule = new UnderIndicatorRule(closePriceIndicator,chandelierExitLongIndicator);
+
+                    Rule downTrend = new UnderIndicatorRule(shortEma, emaDownTrendLine);
+                    Rule priceUnderLongReversalArea = new UnderIndicatorRule(closePriceIndicator, emaDownTrendLine);
+                    Rule highPriceMovesDown = new UnderIndicatorRule(highPivotPoints, new DelayIndicator(highPivotPoints, 1));
+                    Rule oversoldIndicatorMovesUp = new OverIndicatorRule(rsiAtHighPivotPoints, new DelayIndicator(rsiAtHighPivotPoints, 1));
+
+                    Rule shortEntryRule = downTrend.and(priceUnderLongReversalArea).and(highPriceMovesDown).and(oversoldIndicatorMovesUp);
+
+                    ChandelierExitShortIndicator chandelierExitShortIndicator = new ChandelierExitShortIndicator(series, 22, chandelierExitMultiplier);
+
+                    Rule shortExitRule = new OverIndicatorRule(closePriceIndicator,chandelierExitShortIndicator);
+
+                    return new StrategyCreationResult(longEntryRule, longExitRule, null);
+                }
+        );
     }
 
     @Test
@@ -437,6 +495,27 @@ public class IntelligentTa4jOhlcBenchmarks {
     }
 
     @Test
+    public void benchmarkPureEmaTa4j() {
+        runBenchmarkForFourVariables("Ta4jPureEma",
+                i -> j -> k -> l -> series -> {
+                    ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
+
+                    EMAIndicator buyIndicatorLong = new EMAIndicator(closePriceIndicator, Math.toIntExact(i));
+                    Indicator<Num> buyIndicatorShort = new EMAIndicator(closePriceIndicator, Math.toIntExact(j));
+
+                    EMAIndicator sellIndicatorLong = new EMAIndicator(closePriceIndicator, Math.toIntExact(k));
+                    Indicator<Num> sellIndicatorShort = new EMAIndicator(closePriceIndicator, Math.toIntExact(l));
+
+                    Rule entryRule = new CrossedUpIndicatorRule(buyIndicatorShort, buyIndicatorLong) // Trend
+                    ;
+
+                    Rule exitRule = new CrossedDownIndicatorRule(sellIndicatorShort, sellIndicatorLong) // Trend
+                    ;
+                    return new StrategyCreationResult(entryRule, exitRule, null);
+                });
+    }
+
+    @Test
     public void benchmarkEmaTa4j() {
         runBenchmarkForFourVariables("Ta4jMacd",
                 i -> j -> k -> l -> series -> {
@@ -454,15 +533,17 @@ public class IntelligentTa4jOhlcBenchmarks {
                     Indicator<Num> sellIndicatorShort = new EMAIndicator(closePriceIndicator, Math.toIntExact(j));
 
                     Rule entryRule = new OverIndicatorRule(buyIndicatorShort, buyIndicatorLong) // Trend
-                            .and(new CrossedDownIndicatorRule(stochasticOscillaltorK, 20)) // Signal 1
+                            .and(new UnderIndicatorRule(stochasticOscillaltorK, 20)) // Signal 1
                             .and(new OverIndicatorRule(macd, emaMacd)); // Signal 2
                             ;
 
                     Rule exitRule = new UnderIndicatorRule(sellIndicatorShort, sellIndicatorLong) // Trend
-                            .and(new CrossedUpIndicatorRule(stochasticOscillaltorK, 80)) // Signal 1
+                            .and(new OverIndicatorRule(stochasticOscillaltorK, 80)) // Signal 1
                             .and(new UnderIndicatorRule(macd, emaMacd)); // Signal 2
                             ;
                     return new StrategyCreationResult(entryRule, exitRule, null);
+
+
                 });
     }
 
