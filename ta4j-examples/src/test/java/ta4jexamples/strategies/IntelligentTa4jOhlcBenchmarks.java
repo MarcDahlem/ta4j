@@ -134,7 +134,7 @@ public class IntelligentTa4jOhlcBenchmarks {
         //upPercentage = 10;
         upPercentage = 1.309;
         upPercentage = 1.1545;
-        upPercentage = 2;
+        //upPercentage = 2;
 
         //lookback_max = 11;
         lookback_max = 400;

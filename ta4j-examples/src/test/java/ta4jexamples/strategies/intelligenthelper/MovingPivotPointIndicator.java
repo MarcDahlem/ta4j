@@ -13,7 +13,7 @@ import org.ta4j.core.num.Num;
 
 public abstract class MovingPivotPointIndicator extends CachedIndicator<Num> {
 
-    private final int frameSize;
+    protected final int frameSize;
     private final String uuid;
     private static final Map<String, Integer> latestSeenIndex = new HashMap<>();
 
@@ -47,10 +47,12 @@ public abstract class MovingPivotPointIndicator extends CachedIndicator<Num> {
     protected Num calculate(int index, int currentCalculationTick) {
         Optional<Integer> latestPivotIndex = getLatestPivotIndex(index, currentCalculationTick);
         if (latestPivotIndex.isPresent()) {
-            return this.getValueIndicator().getValue(latestPivotIndex.get());
+            return this.getValueAt(latestPivotIndex.get(), currentCalculationTick);
         }
         return NaN;
     }
+
+    protected abstract Num getValueAt(int index, int currentCalculationTick);
 
     private Optional<Integer> getLatestPivotIndex(int index, int currentCalculationTick) {
         while (index >= getBarSeries().getBeginIndex()) {
@@ -84,8 +86,6 @@ public abstract class MovingPivotPointIndicator extends CachedIndicator<Num> {
     }
 
     protected abstract Indicator<Num> getPivotIndicator();
-
-    protected abstract Indicator<Num> getValueIndicator();
 
     protected abstract boolean contradictsPivot(Num valueToCheck, Num otherValue);
 }

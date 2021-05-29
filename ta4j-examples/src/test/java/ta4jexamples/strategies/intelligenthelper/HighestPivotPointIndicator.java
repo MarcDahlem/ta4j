@@ -2,7 +2,9 @@ package ta4jexamples.strategies.intelligenthelper;
 
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
+import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.helpers.HighPriceIndicator;
+import org.ta4j.core.indicators.helpers.HighestValueIndicator;
 import org.ta4j.core.num.Num;
 
 public class HighestPivotPointIndicator extends MovingPivotPointIndicator {
@@ -20,13 +22,21 @@ public class HighestPivotPointIndicator extends MovingPivotPointIndicator {
     }
 
     @Override
-    protected Indicator<Num> getPivotIndicator() {
-        return highPriceIndicator;
+    protected Num getValueAt(int index, int currentCalculationTick) {
+        if (valueIndicator instanceof RSIIndicator) {
+            int startIndex = Math.max(index - frameSize, getBarSeries().getBeginIndex());
+            int endIndex = Math.min(index + frameSize, currentCalculationTick);
+            int futureDelay = (endIndex - index) * -1;
+            int restrictedFrameSize = endIndex - startIndex;
+            HighestValueIndicator indicator = new HighestValueIndicator(new DelayIndicator(valueIndicator, futureDelay), restrictedFrameSize + 1);
+            return indicator.getValue(index);
+        }
+        return valueIndicator.getValue(index);
     }
 
     @Override
-    protected Indicator<Num> getValueIndicator() {
-        return valueIndicator;
+    protected Indicator<Num> getPivotIndicator() {
+        return highPriceIndicator;
     }
 
     @Override
