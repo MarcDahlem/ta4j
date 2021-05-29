@@ -129,14 +129,65 @@ public class IntelligentTa4jOhlcBenchmarks {
 
         //upPercentage = 10;
         upPercentage = 1.309;
+        upPercentage = 1.1545;
+        //upPercentage = 2;
+
         //lookback_max = 11;
         lookback_max = 400;
 
-        upPercentageBig = new BigDecimal("1.309");
+        upPercentageBig = new BigDecimal("1.1545");
 
         //percentageUpperBound = new BigDecimal("0.001");
         percentageUpperBound = new BigDecimal("0.1");
 
+    }
+
+    @Test
+    public void benchmarkHiddenConversionWithFixedTakeProfitTa4j() {
+        runBenchmarkForFourVariables("HiddenConversionWithFixedTakeProfit",
+                i -> j -> k -> l -> series -> {
+                    ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
+
+                    int pivotCalculationFrame = k;
+
+                    EMAIndicator longEma = new EMAIndicator(closePriceIndicator, i);
+                    EMAIndicator shortEma = new EMAIndicator(closePriceIndicator, j);
+                    RSIIndicator rsi = new RSIIndicator(new ClosePriceIndicator(series), 14);
+
+                    HighestPivotPointIndicator highPivotPoints = new HighestPivotPointIndicator(series, pivotCalculationFrame);
+                    LowestPivotPointIndicator lowPivotPoints = new LowestPivotPointIndicator(series, pivotCalculationFrame);
+                    ATRIndicator trueRangeIndicator = new ATRIndicator(series, 14);
+                    TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
+                    CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
+                    CombineIndicator emaDownTrendLine = minus(longEma, trueRangeFactor);
+
+                    HighestPivotPointIndicator rsiAtHighPivotPoints = new HighestPivotPointIndicator(series, rsi, pivotCalculationFrame);
+                    LowestPivotPointIndicator rsiAtLowPivotPoints = new LowestPivotPointIndicator(series, rsi, pivotCalculationFrame);
+
+                    Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
+                    Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
+                    Rule lowPriceMovesUp = new OverIndicatorRule(lowPivotPoints, new DelayIndicator(lowPivotPoints, 1));
+                    Rule oversoldIndicatorMovesDown = new UnderIndicatorRule(rsiAtLowPivotPoints, new DelayIndicator(rsiAtLowPivotPoints, 1));
+
+                    Rule longEntryRule = upTrend.and(priceOverLongReversalArea).and(lowPriceMovesUp).and(oversoldIndicatorMovesDown);
+
+                    SellIndicator breakEvenIndicator = SellIndicator.createClosepriceBreakEvenIndicator(series, enterFee, exitFee);
+                    Number targetToRiskRatio = 2;
+                    Indicator<Num> buyPriceIndicator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, closePriceIndicator.getValue(buyIndex)));
+                    Num riskPercentageFactor = series.numOf(1).minus(series.numOf(l).dividedBy(series.numOf(100)));
+                    Indicator<Num> stopLoss = multiply(buyPriceIndicator, riskPercentageFactor.getDelegate());
+
+                    CombineIndicator sellPriceGainCal = multiply(plus(multiply(minus(divide(closePriceIndicator, stopLoss), 1), targetToRiskRatio), 1), buyPriceIndicator);
+                    SellIndicator gainSellPriceCalculator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, sellPriceGainCal.getValue(buyIndex)));
+
+                    Rule takeProfitAndBreakEvenReached = new OverIndicatorRule(closePriceIndicator, gainSellPriceCalculator).and(new OverIndicatorRule(closePriceIndicator, breakEvenIndicator));
+                    UnderIndicatorRule stopLossReached = new UnderIndicatorRule(closePriceIndicator, stopLoss);
+
+                    Rule exitRule = stopLossReached.or(takeProfitAndBreakEvenReached);
+
+                    return new StrategyCreationResult(longEntryRule, exitRule, breakEvenIndicator);
+                }
+        );
     }
 
     @Test
@@ -659,8 +710,8 @@ public class IntelligentTa4jOhlcBenchmarks {
 
         for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
-                for (long k = 1; k < lookback_max; k = Math.round(Math.ceil(k * upPercentage))) {
-                    for (long l = 1; l < lookback_max; l = Math.round(Math.ceil(l * upPercentage))) {
+                for (long k = 1; k < 17; k = Math.round(Math.ceil(k * upPercentage))) {
+                    for (long l = 1; l < 3; l = Math.round(Math.ceil(l * upPercentage))) {
                         String currentStrategyName = "i(" + i + "), j(" + j + "), k(" + k + "),l(" + l + ")";
                         LOG.info(currentStrategyName);
                         List<StrategyConfiguration> strategiesForTheSeries = new LinkedList<>();

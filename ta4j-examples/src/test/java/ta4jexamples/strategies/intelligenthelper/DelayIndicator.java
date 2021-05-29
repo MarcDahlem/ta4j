@@ -18,9 +18,9 @@ public class DelayIndicator extends CachedIndicator<Num> {
 
     @Override
     protected Num calculate(int index) {
-        int indexInPast = index - delay;
-        if (indexInPast >= getBarSeries().getBeginIndex()) {
-            return indicator.getValue(indexInPast);
+        int delayedIndex = index - delay;
+        if (delayedIndex >= getBarSeries().getBeginIndex() && delayedIndex <= getBarSeries().getEndIndex()) {
+            return indicator.getValue(delayedIndex);
         }
         return NaN;
     }
