@@ -27,9 +27,9 @@ import static org.ta4j.core.indicators.helpers.TransformIndicator.minus;
 import static org.ta4j.core.indicators.helpers.TransformIndicator.multiply;
 import static org.ta4j.core.indicators.helpers.TransformIndicator.plus;
 import static ta4jexamples.strategies.intelligenthelper.CombineIndicator.divide;
+import static ta4jexamples.strategies.intelligenthelper.CombineIndicator.minus;
 import static ta4jexamples.strategies.intelligenthelper.CombineIndicator.multiply;
 import static ta4jexamples.strategies.intelligenthelper.CombineIndicator.plus;
-import static ta4jexamples.strategies.intelligenthelper.CombineIndicator.minus;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 
 import org.junit.Before;
@@ -66,6 +67,8 @@ import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.SellIndicator;
 import org.ta4j.core.indicators.StochasticOscillatorKIndicator;
 import org.ta4j.core.indicators.UnstableIndicator;
+import org.ta4j.core.indicators.candles.BullishEngulfingIndicator;
+import org.ta4j.core.indicators.candles.BullishHaramiIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.ConstantIndicator;
 import org.ta4j.core.indicators.helpers.LowestValueIndicator;
@@ -80,6 +83,7 @@ import org.ta4j.core.num.Num;
 import org.ta4j.core.reports.PerformanceReport;
 import org.ta4j.core.reports.PositionStatsReport;
 import org.ta4j.core.reports.TradingStatement;
+import org.ta4j.core.rules.BooleanIndicatorRule;
 import org.ta4j.core.rules.CrossedDownIndicatorRule;
 import org.ta4j.core.rules.CrossedUpIndicatorRule;
 import org.ta4j.core.rules.FixedRule;
@@ -130,7 +134,7 @@ public class IntelligentTa4jOhlcBenchmarks {
         //upPercentage = 10;
         upPercentage = 1.309;
         upPercentage = 1.1545;
-        //upPercentage = 2;
+        upPercentage = 2;
 
         //lookback_max = 11;
         lookback_max = 400;
@@ -143,9 +147,10 @@ public class IntelligentTa4jOhlcBenchmarks {
     }
 
     @Test
-    public void benchmarkHiddenConversionWithFixedTakeProfitTa4j() {
-        runBenchmarkForFourVariables("HiddenConversionWithFixedTakeProfit",
+    public void benchmarkHiddenConversionThreeLookbackWithFixedTakeProfitSeriesTa4j() {
+        runBenchmarkForFourVariables("HiddenConversionThreeLookbackWithFixedTakeProfitSeries",
                 i -> j -> k -> l -> series -> {
+                    String uuid = UUID.randomUUID().toString();
                     ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
 
                     int pivotCalculationFrame = k;
@@ -154,22 +159,100 @@ public class IntelligentTa4jOhlcBenchmarks {
                     EMAIndicator shortEma = new EMAIndicator(closePriceIndicator, j);
                     RSIIndicator rsi = new RSIIndicator(new ClosePriceIndicator(series), 14);
 
-                    HighestPivotPointIndicator highPivotPoints = new HighestPivotPointIndicator(series, pivotCalculationFrame);
-                    LowestPivotPointIndicator lowPivotPoints = new LowestPivotPointIndicator(series, pivotCalculationFrame);
+
                     ATRIndicator trueRangeIndicator = new ATRIndicator(series, 14);
                     TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
                     CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
-                    CombineIndicator emaDownTrendLine = minus(longEma, trueRangeFactor);
 
-                    HighestPivotPointIndicator rsiAtHighPivotPoints = new HighestPivotPointIndicator(series, rsi, pivotCalculationFrame);
-                    LowestPivotPointIndicator rsiAtLowPivotPoints = new LowestPivotPointIndicator(series, rsi, pivotCalculationFrame);
+                    LowestPivotPointIndicator lastLow = new LowestPivotPointIndicator(series, pivotCalculationFrame, uuid);
+                    LowestPivotPointIndicator rsiAtLastLow = new LowestPivotPointIndicator(series, rsi, pivotCalculationFrame, uuid);
+
+                    LowestPivotPointIndicator secondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), pivotCalculationFrame, uuid);
+                    LowestPivotPointIndicator rsiAtSecondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), pivotCalculationFrame, uuid);
+
+                    LowestPivotPointIndicator thirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(secondLastLow, 1), pivotCalculationFrame, uuid);
+                    LowestPivotPointIndicator rsiAtThirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtSecondLastLow, 1), pivotCalculationFrame, uuid);
 
                     Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
                     Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
-                    Rule lowPriceMovesUp = new OverIndicatorRule(lowPivotPoints, new DelayIndicator(lowPivotPoints, 1));
-                    Rule oversoldIndicatorMovesDown = new UnderIndicatorRule(rsiAtLowPivotPoints, new DelayIndicator(rsiAtLowPivotPoints, 1));
+                    Rule lowPriceMovesUp = new OverIndicatorRule(lastLow, secondLastLow);
 
-                    Rule longEntryRule = upTrend.and(priceOverLongReversalArea).and(lowPriceMovesUp).and(oversoldIndicatorMovesDown);
+                    Rule oversoldIndicatorMovesDown = new UnderIndicatorRule(rsiAtLastLow, rsiAtSecondLastLow);
+
+                    Rule lowPriceMovesUpLooback2 = new OverIndicatorRule(lastLow, thirdLastLow);
+                    Rule oversoldIndicatorMovesDownLookback2 = new UnderIndicatorRule(rsiAtLastLow, rsiAtThirdLastLow);
+
+                    Rule candleStickPattern = new BooleanIndicatorRule(new BullishEngulfingIndicator(series))
+                            .or(new BooleanIndicatorRule(new BullishHaramiIndicator(series)))
+                            //.or(new BooleanIndicatorRule(new ThreeWhiteSoldiersIndicator(series, pivotCalculationFrame, series.numOf(0.1))))
+                            ;
+
+                    Rule hiddenDivergenceBetweenLastTwo = lowPriceMovesUp.and(oversoldIndicatorMovesDown);
+                    Rule hiddenDivergenceBetweenLastAndThird = lowPriceMovesUpLooback2.and(oversoldIndicatorMovesDownLookback2);
+
+                    Rule hiddenDivergence = hiddenDivergenceBetweenLastTwo.or(hiddenDivergenceBetweenLastAndThird);
+
+                    Rule longEntryRule = upTrend
+                            .and(priceOverLongReversalArea)
+                            .and(hiddenDivergence)
+                            .and(candleStickPattern);
+
+                    SellIndicator breakEvenIndicator = SellIndicator.createClosepriceBreakEvenIndicator(series, enterFee, exitFee);
+                    Number targetToRiskRatio = 2;
+                    Indicator<Num> buyPriceIndicator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, closePriceIndicator.getValue(buyIndex)));
+                    Num riskPercentageFactor = series.numOf(1).minus(series.numOf(l).dividedBy(series.numOf(100)));
+                    Indicator<Num> stopLoss = multiply(buyPriceIndicator, riskPercentageFactor.getDelegate());
+
+                    CombineIndicator sellPriceGainCal = multiply(plus(multiply(minus(divide(closePriceIndicator, stopLoss), 1), targetToRiskRatio), 1), buyPriceIndicator);
+                    SellIndicator gainSellPriceCalculator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, sellPriceGainCal.getValue(buyIndex)));
+
+                    Rule takeProfitAndBreakEvenReached = new OverIndicatorRule(closePriceIndicator, gainSellPriceCalculator).and(new OverIndicatorRule(closePriceIndicator, breakEvenIndicator));
+                    UnderIndicatorRule stopLossReached = new UnderIndicatorRule(closePriceIndicator, stopLoss);
+
+                    Rule exitRule = stopLossReached.or(takeProfitAndBreakEvenReached);
+
+                    return new StrategyCreationResult(longEntryRule, exitRule, breakEvenIndicator);
+                }
+        );
+    }
+
+    @Test
+    public void benchmarkHiddenConversionWithFixedTakeProfitSeriesTa4j() {
+        runBenchmarkForFourVariables("HiddenConversionWithFixedTakeProfitSeries",
+                i -> j -> k -> l -> series -> {
+                    String uuid = UUID.randomUUID().toString();
+                    ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
+
+                    int pivotCalculationFrame = k;
+
+                    EMAIndicator longEma = new EMAIndicator(closePriceIndicator, i);
+                    EMAIndicator shortEma = new EMAIndicator(closePriceIndicator, j);
+                    RSIIndicator rsi = new RSIIndicator(new ClosePriceIndicator(series), 14);
+
+                    LowestPivotPointIndicator lowPivotPoints = new LowestPivotPointIndicator(series, pivotCalculationFrame, uuid);
+                    ATRIndicator trueRangeIndicator = new ATRIndicator(series, 14);
+                    TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
+                    CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
+
+                    LowestPivotPointIndicator rsiAtLowPivotPoints = new LowestPivotPointIndicator(series, rsi, pivotCalculationFrame, uuid);
+                    DelayIndicator previousPivotCalculation = new DelayIndicator(lowPivotPoints, 1);
+                    LowestPivotPointIndicator previousLowPivotPoint = new LowestPivotPointIndicator(series, previousPivotCalculation, pivotCalculationFrame, uuid);
+
+                    Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
+                    Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
+                    Rule lowPriceMovesUp = new OverIndicatorRule(lowPivotPoints, previousLowPivotPoint);
+                    DelayIndicator rsiAtPreviousPivotCalculation = new DelayIndicator(rsiAtLowPivotPoints, 1);
+
+                    LowestPivotPointIndicator rsiAtPreviousLowPivotPoints = new LowestPivotPointIndicator(series, rsiAtPreviousPivotCalculation, pivotCalculationFrame, uuid);
+                    Rule oversoldIndicatorMovesDown = new UnderIndicatorRule(rsiAtLowPivotPoints, rsiAtPreviousLowPivotPoints);
+
+                    Rule candleStickPattern = new BooleanIndicatorRule(new BullishEngulfingIndicator(series))
+                            .or(new BooleanIndicatorRule(new BullishHaramiIndicator(series)))
+                            //.or(new BooleanIndicatorRule(new ThreeWhiteSoldiersIndicator(series, pivotCalculationFrame, series.numOf(0.1))))
+                            ;
+
+
+                    Rule longEntryRule = upTrend.and(priceOverLongReversalArea).and(lowPriceMovesUp).and(oversoldIndicatorMovesDown).and(candleStickPattern);
 
                     SellIndicator breakEvenIndicator = SellIndicator.createClosepriceBreakEvenIndicator(series, enterFee, exitFee);
                     Number targetToRiskRatio = 2;
@@ -195,7 +278,7 @@ public class IntelligentTa4jOhlcBenchmarks {
         runBenchmarkForFourVariables("HiddenConversionWithChandelierExit",
                 i -> j -> k -> l -> series -> {
                     ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
-
+                    String uuid = UUID.randomUUID().toString();
                     int pivotCalculationFrame = k;
                     int chandelierExitMultiplier = l;
 
@@ -203,15 +286,15 @@ public class IntelligentTa4jOhlcBenchmarks {
                     EMAIndicator shortEma = new EMAIndicator(closePriceIndicator, j);
                     RSIIndicator rsi = new RSIIndicator(new ClosePriceIndicator(series), 14);
 
-                    HighestPivotPointIndicator highPivotPoints = new HighestPivotPointIndicator(series, pivotCalculationFrame);
-                    LowestPivotPointIndicator lowPivotPoints = new LowestPivotPointIndicator(series, pivotCalculationFrame);
+                    HighestPivotPointIndicator highPivotPoints = new HighestPivotPointIndicator(series, pivotCalculationFrame, uuid);
+                    LowestPivotPointIndicator lowPivotPoints = new LowestPivotPointIndicator(series, pivotCalculationFrame, uuid);
                     ATRIndicator trueRangeIndicator = new ATRIndicator(series, 14);
                     TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
                     CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
                     CombineIndicator emaDownTrendLine = minus(longEma, trueRangeFactor);
 
-                    HighestPivotPointIndicator rsiAtHighPivotPoints = new HighestPivotPointIndicator(series, rsi, pivotCalculationFrame);
-                    LowestPivotPointIndicator rsiAtLowPivotPoints = new LowestPivotPointIndicator(series, rsi, pivotCalculationFrame);
+                    HighestPivotPointIndicator rsiAtHighPivotPoints = new HighestPivotPointIndicator(series, rsi, pivotCalculationFrame, uuid);
+                    LowestPivotPointIndicator rsiAtLowPivotPoints = new LowestPivotPointIndicator(series, rsi, pivotCalculationFrame, uuid);
 
                     Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
                     Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
@@ -222,7 +305,7 @@ public class IntelligentTa4jOhlcBenchmarks {
 
                     ChandelierExitLongIndicator chandelierExitLongIndicator = new ChandelierExitLongIndicator(series, 22, chandelierExitMultiplier);
 
-                    Rule longExitRule = new UnderIndicatorRule(closePriceIndicator,chandelierExitLongIndicator);
+                    Rule longExitRule = new UnderIndicatorRule(closePriceIndicator, chandelierExitLongIndicator);
 
                     Rule downTrend = new UnderIndicatorRule(shortEma, emaDownTrendLine);
                     Rule priceUnderLongReversalArea = new UnderIndicatorRule(closePriceIndicator, emaDownTrendLine);
@@ -233,7 +316,7 @@ public class IntelligentTa4jOhlcBenchmarks {
 
                     ChandelierExitShortIndicator chandelierExitShortIndicator = new ChandelierExitShortIndicator(series, 22, chandelierExitMultiplier);
 
-                    Rule shortExitRule = new OverIndicatorRule(closePriceIndicator,chandelierExitShortIndicator);
+                    Rule shortExitRule = new OverIndicatorRule(closePriceIndicator, chandelierExitShortIndicator);
 
                     return new StrategyCreationResult(longEntryRule, longExitRule, null);
                 }
@@ -558,10 +641,10 @@ public class IntelligentTa4jOhlcBenchmarks {
                     Indicator<Num> sellIndicatorShort = new EMAIndicator(closePriceIndicator, Math.toIntExact(l));
 
                     Rule entryRule = new CrossedUpIndicatorRule(buyIndicatorShort, buyIndicatorLong) // Trend
-                    ;
+                            ;
 
                     Rule exitRule = new CrossedDownIndicatorRule(sellIndicatorShort, sellIndicatorLong) // Trend
-                    ;
+                            ;
                     return new StrategyCreationResult(entryRule, exitRule, null);
                 });
     }
@@ -586,12 +669,12 @@ public class IntelligentTa4jOhlcBenchmarks {
                     Rule entryRule = new OverIndicatorRule(buyIndicatorShort, buyIndicatorLong) // Trend
                             .and(new UnderIndicatorRule(stochasticOscillaltorK, 20)) // Signal 1
                             .and(new OverIndicatorRule(macd, emaMacd)); // Signal 2
-                            ;
+                    ;
 
                     Rule exitRule = new UnderIndicatorRule(sellIndicatorShort, sellIndicatorLong) // Trend
                             .and(new OverIndicatorRule(stochasticOscillaltorK, 80)) // Signal 1
                             .and(new UnderIndicatorRule(macd, emaMacd)); // Signal 2
-                            ;
+                    ;
                     return new StrategyCreationResult(entryRule, exitRule, null);
 
 
@@ -1017,16 +1100,16 @@ public class IntelligentTa4jOhlcBenchmarks {
         Gson gson = new GsonBuilder().registerTypeAdapter(Strategy.class, strategySerializer).registerTypeAdapter(Num.class, numSerializer).setPrettyPrinting().create();
         switch (interval) {
             case All:
-                suffix =  suffix+"_all.json";
+                suffix = suffix + "_all.json";
                 break;
             case OneMinute:
-                suffix =  suffix+"_1min.json";
+                suffix = suffix + "_1min.json";
                 break;
             case FiveMinutes:
-                suffix =  suffix+"_5min.json";
+                suffix = suffix + "_5min.json";
                 break;
             case FifteenMinutes:
-                suffix =  suffix+"_15min.json";
+                suffix = suffix + "_15min.json";
                 break;
             default:
                 throw new IllegalStateException("Unknown time interval " + interval);
