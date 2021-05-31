@@ -71,6 +71,7 @@ import org.ta4j.core.indicators.candles.BullishEngulfingIndicator;
 import org.ta4j.core.indicators.candles.BullishHaramiIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.ConstantIndicator;
+import org.ta4j.core.indicators.helpers.LowPriceIndicator;
 import org.ta4j.core.indicators.helpers.LowestValueIndicator;
 import org.ta4j.core.indicators.helpers.TransformIndicator;
 import org.ta4j.core.indicators.ichimoku.IchimokuKijunSenIndicator;
@@ -87,6 +88,7 @@ import org.ta4j.core.rules.BooleanIndicatorRule;
 import org.ta4j.core.rules.CrossedDownIndicatorRule;
 import org.ta4j.core.rules.CrossedUpIndicatorRule;
 import org.ta4j.core.rules.FixedRule;
+import org.ta4j.core.rules.IsEqualRule;
 import org.ta4j.core.rules.OverIndicatorRule;
 import org.ta4j.core.rules.UnderIndicatorRule;
 
@@ -123,7 +125,7 @@ public class IntelligentTa4jOhlcBenchmarks {
 
     @Before
     public void setupTests() {
-        interval = JsonRecordingTimeInterval.FiveMinutes;
+        interval = JsonRecordingTimeInterval.OneMinute;
         allSeries = loadSeries();
 
         enterFee = new BigDecimal("0.0024");
@@ -133,8 +135,8 @@ public class IntelligentTa4jOhlcBenchmarks {
 
         //upPercentage = 10;
         upPercentage = 1.309;
-        upPercentage = 1.1545;
-        //upPercentage = 2;
+        //upPercentage = 1.1545;
+        upPercentage = 2;
 
         //lookback_max = 11;
         lookback_max = 400;
@@ -147,8 +149,8 @@ public class IntelligentTa4jOhlcBenchmarks {
     }
 
     @Test
-    public void benchmarkHiddenConversionThreeLookbackWithFixedTakeProfitSeriesTa4j() {
-        runBenchmarkForFourVariables("HiddenConversionThreeLookbackWithFixedTakeProfitSeries",
+    public void benchmarkHiddenConversionThreeLookbackWithFixedTakeProfitOnlyLongEmaSeriesTa4j() {
+        runBenchmarkForFourVariables("HiddenConversionThreeLookbackWithFixedTakeProfitOnlyLongEmaSeries",
                 i -> j -> k -> l -> series -> {
                     String uuid = UUID.randomUUID().toString();
                     ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
@@ -165,6 +167,7 @@ public class IntelligentTa4jOhlcBenchmarks {
                     CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
 
                     LowestPivotPointIndicator lastLow = new LowestPivotPointIndicator(series, pivotCalculationFrame, uuid);
+                    HighestPivotPointIndicator lastHigh = new HighestPivotPointIndicator(series, pivotCalculationFrame, uuid);
                     LowestPivotPointIndicator rsiAtLastLow = new LowestPivotPointIndicator(series, rsi, pivotCalculationFrame, uuid);
 
                     LowestPivotPointIndicator secondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), pivotCalculationFrame, uuid);
@@ -173,8 +176,8 @@ public class IntelligentTa4jOhlcBenchmarks {
                     LowestPivotPointIndicator thirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(secondLastLow, 1), pivotCalculationFrame, uuid);
                     LowestPivotPointIndicator rsiAtThirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtSecondLastLow, 1), pivotCalculationFrame, uuid);
 
-                    Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
-                    Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
+                    Rule upTrend = new OverIndicatorRule(shortEma, longEma);
+                    Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, longEma).and(new OverIndicatorRule(lastHigh, emaUpTrendLine));
                     Rule lowPriceMovesUp = new OverIndicatorRule(lastLow, secondLastLow);
 
                     Rule oversoldIndicatorMovesDown = new UnderIndicatorRule(rsiAtLastLow, rsiAtSecondLastLow);
@@ -192,29 +195,23 @@ public class IntelligentTa4jOhlcBenchmarks {
 
                     Rule hiddenDivergence = hiddenDivergenceBetweenLastTwo.or(hiddenDivergenceBetweenLastAndThird);
 
+                    Rule lastLowIsInFrame = new IsEqualRule(lastLow, new LowestValueIndicator(new LowPriceIndicator(series), pivotCalculationFrame+1));
                     Rule longEntryRule = upTrend
                             .and(priceOverLongReversalArea)
                             .and(hiddenDivergence)
-                            .and(candleStickPattern);
+                            //.and(candleStickPattern)
+                            .and(lastLowIsInFrame)
+                            ;
 
                     SellIndicator breakEvenIndicator = SellIndicator.createClosepriceBreakEvenIndicator(series, enterFee, exitFee);
-                    Number targetToRiskRatio = 2;
-                    Indicator<Num> buyPriceIndicator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, closePriceIndicator.getValue(buyIndex)));
-                    Num riskPercentageFactor = series.numOf(1).minus(series.numOf(l).dividedBy(series.numOf(100)));
-                    Indicator<Num> stopLoss = multiply(buyPriceIndicator, riskPercentageFactor.getDelegate());
-
-                    CombineIndicator sellPriceGainCal = multiply(plus(multiply(minus(divide(closePriceIndicator, stopLoss), 1), targetToRiskRatio), 1), buyPriceIndicator);
-                    SellIndicator gainSellPriceCalculator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, sellPriceGainCal.getValue(buyIndex)));
-
-                    Rule takeProfitAndBreakEvenReached = new OverIndicatorRule(closePriceIndicator, gainSellPriceCalculator).and(new OverIndicatorRule(closePriceIndicator, breakEvenIndicator));
-                    UnderIndicatorRule stopLossReached = new UnderIndicatorRule(closePriceIndicator, stopLoss);
-
-                    Rule exitRule = stopLossReached.or(takeProfitAndBreakEvenReached);
+                    Rule exitRule = createFixedStopLossGainProfitRule(series, breakEvenIndicator, l);
 
                     return new StrategyCreationResult(longEntryRule, exitRule, breakEvenIndicator);
                 }
         );
     }
+
+
 
     @Test
     public void benchmarkHiddenConversionWithFixedTakeProfitSeriesTa4j() {
@@ -251,23 +248,16 @@ public class IntelligentTa4jOhlcBenchmarks {
                             //.or(new BooleanIndicatorRule(new ThreeWhiteSoldiersIndicator(series, pivotCalculationFrame, series.numOf(0.1))))
                             ;
 
-
-                    Rule longEntryRule = upTrend.and(priceOverLongReversalArea).and(lowPriceMovesUp).and(oversoldIndicatorMovesDown).and(candleStickPattern);
+                    Rule lastLowIsInFrame = new IsEqualRule(lowPivotPoints, new LowestValueIndicator(new LowPriceIndicator(series), pivotCalculationFrame+1));
+                    Rule longEntryRule = upTrend
+                            .and(priceOverLongReversalArea)
+                            .and(lowPriceMovesUp)
+                            .and(oversoldIndicatorMovesDown)
+                            //.and(candleStickPattern)
+                            .and(lastLowIsInFrame);
 
                     SellIndicator breakEvenIndicator = SellIndicator.createClosepriceBreakEvenIndicator(series, enterFee, exitFee);
-                    Number targetToRiskRatio = 2;
-                    Indicator<Num> buyPriceIndicator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, closePriceIndicator.getValue(buyIndex)));
-                    Num riskPercentageFactor = series.numOf(1).minus(series.numOf(l).dividedBy(series.numOf(100)));
-                    Indicator<Num> stopLoss = multiply(buyPriceIndicator, riskPercentageFactor.getDelegate());
-
-                    CombineIndicator sellPriceGainCal = multiply(plus(multiply(minus(divide(closePriceIndicator, stopLoss), 1), targetToRiskRatio), 1), buyPriceIndicator);
-                    SellIndicator gainSellPriceCalculator = new SellIndicator(series, breakEvenIndicator, (buyIndex, index) -> new ConstantIndicator<>(series, sellPriceGainCal.getValue(buyIndex)));
-
-                    Rule takeProfitAndBreakEvenReached = new OverIndicatorRule(closePriceIndicator, gainSellPriceCalculator).and(new OverIndicatorRule(closePriceIndicator, breakEvenIndicator));
-                    UnderIndicatorRule stopLossReached = new UnderIndicatorRule(closePriceIndicator, stopLoss);
-
-                    Rule exitRule = stopLossReached.or(takeProfitAndBreakEvenReached);
-
+                    Rule exitRule = createFixedStopLossGainProfitRule(series, breakEvenIndicator, l);
                     return new StrategyCreationResult(longEntryRule, exitRule, breakEvenIndicator);
                 }
         );
@@ -793,8 +783,8 @@ public class IntelligentTa4jOhlcBenchmarks {
 
         for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
-                for (long k = 1; k < 17; k = Math.round(Math.ceil(k * upPercentage))) {
-                    for (long l = 1; l < 3; l = Math.round(Math.ceil(l * upPercentage))) {
+                for (long k = 1; k < 33; k = Math.round(Math.ceil(k * upPercentage))) {
+                    for (long l = 1; l < 33; l = Math.round(Math.ceil(l * upPercentage))) {
                         String currentStrategyName = "i(" + i + "), j(" + j + "), k(" + k + "),l(" + l + ")";
                         LOG.info(currentStrategyName);
                         List<StrategyConfiguration> strategiesForTheSeries = new LinkedList<>();
@@ -1050,6 +1040,27 @@ public class IntelligentTa4jOhlcBenchmarks {
         BigDecimal minimumAboveBreakEvenAsFactor = BigDecimal.ONE.subtract(minAbove);
         TransformIndicator minimalDistanceNeededToBreakEven = TransformIndicator.divide(breakEvenIndicator, minimumAboveBreakEvenAsFactor);
         return CombineIndicator.min(limitIndicator, minimalDistanceNeededToBreakEven);
+    }
+
+    private Rule createFixedStopLossGainProfitRule(BarSeries series, SellIndicator breakEvenIndicator, int atrRatio) {
+        ATRIndicator trueRangeIndicator = new ATRIndicator(series, 14);
+        Number profitGainRatio = 2;
+        Number stoplossAtrRatio = atrRatio;
+        TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, stoplossAtrRatio);
+
+        Indicator<Num> enterPriceIndicator = SellIndicator.createEnterPriceIndicator(breakEvenIndicator);
+        ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
+
+        SellIndicator stopLoss = new SellIndicator(series, breakEvenIndicator,
+                (entryIndex, index) -> new ConstantIndicator<>(series, minus(enterPriceIndicator, trueRangeFactor).getValue(entryIndex)));
+        CombineIndicator factorBetweenStopLossAndEnterPrice = divide(enterPriceIndicator, stopLoss); // eg. 5/4==1.25 long or 4/5 = 0.8 short
+        TransformIndicator percentageGainOrLossOfStopLoss = minus(factorBetweenStopLossAndEnterPrice, 1); // 0.25 long or -0.2 short
+        Indicator<Num> percentageGainOrLossToReach = multiply(percentageGainOrLossOfStopLoss, profitGainRatio); // 0.25*2 = 0.5 long or -0.2*2 = -0.4
+        TransformIndicator factorToReachForGainOrLoss = plus(percentageGainOrLossToReach, 1); // 1.5 long or 0.6 short
+        CombineIndicator exitTakeProfitCalculator = multiply(factorToReachForGainOrLoss, enterPriceIndicator); // 5*1.5 = 7.5 Long or 5*0.6 = 3 short
+        UnderIndicatorRule stopLossReached = new UnderIndicatorRule(closePriceIndicator, stopLoss);
+        Rule takeProfitReached = new OverIndicatorRule(closePriceIndicator, exitTakeProfitCalculator);
+        return stopLossReached.or(takeProfitReached);
     }
 
     private static String printReport(List<TradingStatement> tradingStatements) {

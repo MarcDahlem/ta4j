@@ -61,6 +61,12 @@ public class SellIndicator extends TradeBasedIndicator<Num> {
         return new SellIndicator(series, (buyIndex, index) -> new ConstantIndicator<>(series, breakEvenCalculator.getValue(buyIndex)));
     }
 
+    public static Indicator<Num> createEnterPriceIndicator(SellIndicator tradeKnowingIndicator) {
+        ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(tradeKnowingIndicator.getBarSeries());
+        return new SellIndicator(tradeKnowingIndicator.getBarSeries(), tradeKnowingIndicator,
+                (entryIndex, index) -> new ConstantIndicator<>(tradeKnowingIndicator.getBarSeries(), closePriceIndicator.getValue(entryIndex)));
+    }
+
     public static SellIndicator createSellLimitIndicator(BarSeries series, BigDecimal limitPercentageUnderCurrentBid, SellIndicator tradeKnowingIndicator) {
         LowPriceIndicator bidPriceIndicator = new LowPriceIndicator(series);
         BigDecimal limitScaleFactor = BigDecimal.ONE.subtract(limitPercentageUnderCurrentBid);

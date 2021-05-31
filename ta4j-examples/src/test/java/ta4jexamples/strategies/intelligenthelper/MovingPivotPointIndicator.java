@@ -74,6 +74,10 @@ public abstract class MovingPivotPointIndicator extends CachedIndicator<Num> {
             endIndex = currentCalculationEndIndex;
         }
 
+        if (endIndex-index <= (frameSize/3)) {
+            return false;
+        }
+
         for (int inFrameIndex = startIndex; inFrameIndex <= endIndex; inFrameIndex++) {
             if (index != inFrameIndex) {
                 Num otherValue = getPivotIndicator().getValue(inFrameIndex);

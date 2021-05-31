@@ -23,14 +23,14 @@ public class HighestPivotPointIndicator extends MovingPivotPointIndicator {
 
     @Override
     protected Num getValueAt(int index, int currentCalculationTick) {
-        if (valueIndicator instanceof RSIIndicator) {
+        /*if (valueIndicator instanceof RSIIndicator) {
             int startIndex = Math.max(index - frameSize, getBarSeries().getBeginIndex());
             int endIndex = Math.min(index + frameSize, currentCalculationTick);
             int futureDelay = (endIndex - index) * -1;
             int restrictedFrameSize = endIndex - startIndex;
             HighestValueIndicator indicator = new HighestValueIndicator(new DelayIndicator(valueIndicator, futureDelay), restrictedFrameSize + 1);
             return indicator.getValue(index);
-        }
+        }*/
         return valueIndicator.getValue(index);
     }
 
