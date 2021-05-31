@@ -149,8 +149,8 @@ public class IntelligentTa4jOhlcBenchmarks {
     }
 
     @Test
-    public void benchmarkHiddenConversionThreeLookbackWithFixedTakeProfitOnlyLongEmaSeriesTa4j() {
-        runBenchmarkForFourVariables("HiddenConversionThreeLookbackWithFixedTakeProfitOnlyLongEmaSeries",
+    public void benchmarkHiddenConversionThreeLookbackWithFixedTakeProfitSeriesTa4j() {
+        runBenchmarkForFourVariables("HiddenConversionThreeLookbackWithFixedTakeProfitSeries",
                 i -> j -> k -> l -> series -> {
                     String uuid = UUID.randomUUID().toString();
                     ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
@@ -167,7 +167,6 @@ public class IntelligentTa4jOhlcBenchmarks {
                     CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
 
                     LowestPivotPointIndicator lastLow = new LowestPivotPointIndicator(series, pivotCalculationFrame, uuid);
-                    HighestPivotPointIndicator lastHigh = new HighestPivotPointIndicator(series, pivotCalculationFrame, uuid);
                     LowestPivotPointIndicator rsiAtLastLow = new LowestPivotPointIndicator(series, rsi, pivotCalculationFrame, uuid);
 
                     LowestPivotPointIndicator secondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), pivotCalculationFrame, uuid);
@@ -176,8 +175,8 @@ public class IntelligentTa4jOhlcBenchmarks {
                     LowestPivotPointIndicator thirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(secondLastLow, 1), pivotCalculationFrame, uuid);
                     LowestPivotPointIndicator rsiAtThirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtSecondLastLow, 1), pivotCalculationFrame, uuid);
 
-                    Rule upTrend = new OverIndicatorRule(shortEma, longEma);
-                    Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, longEma).and(new OverIndicatorRule(lastHigh, emaUpTrendLine));
+                    Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
+                    Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
                     Rule lowPriceMovesUp = new OverIndicatorRule(lastLow, secondLastLow);
 
                     Rule oversoldIndicatorMovesDown = new UnderIndicatorRule(rsiAtLastLow, rsiAtSecondLastLow);
