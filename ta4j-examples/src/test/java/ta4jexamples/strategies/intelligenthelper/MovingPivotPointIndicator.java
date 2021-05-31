@@ -15,12 +15,14 @@ public abstract class MovingPivotPointIndicator extends CachedIndicator<Num> {
 
     protected final int frameSize;
     private final String uuid;
+    private final int liveLookbackFactor;
     private static final Map<String, Integer> latestSeenIndex = new HashMap<>();
 
-    protected MovingPivotPointIndicator(BarSeries series, int frameSize, String uuid) {
+    protected MovingPivotPointIndicator(BarSeries series, int frameSize, String uuid, int liveLookbackFactor) {
         super(series);
         this.frameSize = frameSize;
         this.uuid = uuid;
+        this.liveLookbackFactor = liveLookbackFactor;
     }
 
     @Override
@@ -74,7 +76,7 @@ public abstract class MovingPivotPointIndicator extends CachedIndicator<Num> {
             endIndex = currentCalculationEndIndex;
         }
 
-        if (endIndex-index <= (frameSize/3)) {
+        if (endIndex-index <= (frameSize/liveLookbackFactor)) {
             return false;
         }
 

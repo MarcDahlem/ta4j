@@ -11,12 +11,12 @@ public class HighestPivotPointIndicator extends MovingPivotPointIndicator {
     private final HighPriceIndicator highPriceIndicator;
     private final Indicator<Num> valueIndicator;
 
-    public HighestPivotPointIndicator(BarSeries series, int frameSize, String uuid) {
-        this(series, null, frameSize, uuid);
+    public HighestPivotPointIndicator(BarSeries series, int frameSize, String uuid, int liveLookbackFactor) {
+        this(series, null, frameSize, uuid, liveLookbackFactor);
     }
 
-    public HighestPivotPointIndicator(BarSeries series, Indicator<Num> valueIndicator, int frameSize, String uuid) {
-        super(series, frameSize, uuid);
+    public HighestPivotPointIndicator(BarSeries series, Indicator<Num> valueIndicator, int frameSize, String uuid, int liveLookbackFactor) {
+        super(series, frameSize, uuid, liveLookbackFactor);
         this.highPriceIndicator = new HighPriceIndicator(series);
         this.valueIndicator = valueIndicator == null ? highPriceIndicator : valueIndicator;
     }

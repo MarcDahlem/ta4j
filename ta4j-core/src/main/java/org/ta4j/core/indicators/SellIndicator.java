@@ -96,6 +96,19 @@ public class SellIndicator extends TradeBasedIndicator<Num> {
                 lowestSinceCreator);
     }
 
+    public static SellIndicator createHighestSinceLastEnterIndicator(Indicator<Num> originalIndicator, SellIndicator tradeKnowingIndicator) {
+
+        final BiFunction<Integer, Integer, Indicator<Num>> highestSinceCreator = (Integer enterIndex, Integer index) -> {
+            int lookbackUntilLastEnter = index - enterIndex;
+            return new HighestValueIndicator(originalIndicator, lookbackUntilLastEnter+1);
+        };
+
+        return new SellIndicator(
+                originalIndicator.getBarSeries(),
+                tradeKnowingIndicator,
+                highestSinceCreator);
+    }
+
     private static BiFunction<Integer, Integer, Indicator<Num>> getNanCreator(BarSeries series) {
         return (Integer startIndex, Integer index) -> new ConstantIndicator<>(series, NaN);
     }

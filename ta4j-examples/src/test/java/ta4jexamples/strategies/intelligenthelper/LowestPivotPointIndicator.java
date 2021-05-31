@@ -12,12 +12,12 @@ public class LowestPivotPointIndicator extends MovingPivotPointIndicator {
     private final LowPriceIndicator lowPriceIndicator;
     private final Indicator<Num> valueIndicator;
 
-    public LowestPivotPointIndicator(BarSeries series, int frameSize, String uuid) {
-        this(series, null, frameSize, uuid);
+    public LowestPivotPointIndicator(BarSeries series, int frameSize, String uuid, int liveLookbackFactor) {
+        this(series, null, frameSize, uuid, liveLookbackFactor);
     }
 
-    public LowestPivotPointIndicator(BarSeries series, Indicator<Num> valueIndicator, int frameSize, String uuid) {
-        super(series, frameSize, uuid);
+    public LowestPivotPointIndicator(BarSeries series, Indicator<Num> valueIndicator, int frameSize, String uuid, int liveLookbackFactor) {
+        super(series, frameSize, uuid, liveLookbackFactor);
         this.lowPriceIndicator = new LowPriceIndicator(series);
         this.valueIndicator = valueIndicator == null ? lowPriceIndicator : valueIndicator;
     }
