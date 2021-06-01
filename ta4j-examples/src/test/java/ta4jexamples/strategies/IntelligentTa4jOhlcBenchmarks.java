@@ -134,12 +134,12 @@ public class IntelligentTa4jOhlcBenchmarks {
         exitFee = new BigDecimal("0.0024");
         enterFeeFactor = BigDecimal.ONE.add(enterFee);
         exitFeeFactor = BigDecimal.ONE.subtract(exitFee);
-        atrRatio = 8;
+        atrRatio = 5;
 
         //upPercentage = 10;
         upPercentage = 1.309;
-        //upPercentage = 1.1545;
-        upPercentage = 2;
+        upPercentage = 1.1545;
+        //upPercentage = 2;
 
         //lookback_max = 11;
         lookback_max = 400;
@@ -902,7 +902,7 @@ public class IntelligentTa4jOhlcBenchmarks {
         for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
                 for (long k = 1; k < 33; k = Math.round(Math.ceil(k * upPercentage))) {
-                    for (long l = 1; l < 8; l++) {
+                    for (long l = 1; l < 33; l = Math.round(Math.ceil(l * upPercentage))) {
                         String currentStrategyName = "i(" + i + "), j(" + j + "), k(" + k + "),l(" + l + ")";
                         LOG.info(currentStrategyName);
                         List<StrategyConfiguration> strategiesForTheSeries = new LinkedList<>();
