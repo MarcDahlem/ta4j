@@ -5,6 +5,7 @@ import static org.ta4j.core.num.NaN.NaN;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeSet;
 
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
@@ -13,16 +14,16 @@ import org.ta4j.core.num.Num;
 
 public abstract class MovingPivotPointIndicator extends CachedIndicator<Num> {
 
-    protected final int frameSize;
     private final String uuid;
-    private final int liveLookbackFactor;
+    private final int amountConfirmationsNeeded;
     private static final Map<String, Integer> latestSeenIndex = new HashMap<>();
 
-    protected MovingPivotPointIndicator(BarSeries series, int frameSize, String uuid, int liveLookbackFactor) {
+    private MovingPivotPointIndicator oppositPivotIndicator;
+
+    protected MovingPivotPointIndicator(BarSeries series, String uuid, int amountConfirmationsNeeded) {
         super(series);
-        this.frameSize = frameSize;
         this.uuid = uuid;
-        this.liveLookbackFactor = liveLookbackFactor;
+        this.amountConfirmationsNeeded = amountConfirmationsNeeded;
     }
 
     @Override
@@ -54,44 +55,67 @@ public abstract class MovingPivotPointIndicator extends CachedIndicator<Num> {
         return NaN;
     }
 
-    protected abstract Num getValueAt(int index, int currentCalculationTick);
-
     private Optional<Integer> getLatestPivotIndex(int index, int currentCalculationTick) {
-        while (index >= getBarSeries().getBeginIndex()) {
-            if (isPivotIndex(index, currentCalculationTick)) {
-                return Optional.of(index);
-            }
-            index--;
-        }
-        return Optional.empty();
+        ConfirmationMap confirmationMap = buildConfirmationMap(currentCalculationTick);
+        TreeSet<Integer> reversalPoints = confirmationMap.computeReversalPoints(this::contradictsPivot);
+        Integer lastReversalPoint = reversalPoints.floor(index);
+        return lastReversalPoint==null ? Optional.empty() : Optional.of(lastReversalPoint);
     }
 
-    private boolean isPivotIndex(int index, int currentCalculationTick) {
-        Num valueToCheck = getPivotIndicator().getValue(index);
-        int startIndex = Math.max(index - frameSize, getBarSeries().getBeginIndex());
+    private ConfirmationMap buildConfirmationMap(int currentCalculationTick) {
+        ConfirmationMap map = new ConfirmationMap();
         int currentCalculationEndIndex = Math.min(getBarSeries().getEndIndex(), currentCalculationTick);
-        int endIndex = index + frameSize;
-        if (endIndex > currentCalculationEndIndex) {
-            //return false;
-            endIndex = currentCalculationEndIndex;
-        }
-
-        if (endIndex-index <= (frameSize/liveLookbackFactor)) {
-            return false;
-        }
-
-        for (int inFrameIndex = startIndex; inFrameIndex <= endIndex; inFrameIndex++) {
-            if (index != inFrameIndex) {
-                Num otherValue = getPivotIndicator().getValue(inFrameIndex);
-                if (contradictsPivot(valueToCheck, otherValue)) {
-                    return false;
+        Num maximaSinceLastOpposite = null;
+        for(int i = getBarSeries().getBeginIndex(); i<= currentCalculationEndIndex; i++) {
+            if (isConfirmed(i, currentCalculationTick)) {
+                if (maximaSinceLastOpposite == null || contradictsPivot(maximaSinceLastOpposite, getPivotIndicator().getValue(i))) {
+                    map.addConfirmation(i, getPivotIndicator().getValue(i));
+                }
+            }
+            if (oppositPivotIndicator.isConfirmed(i, currentCalculationTick)) {
+                map.addOppositeConfirmation(i);
+                maximaSinceLastOpposite = getPivotIndicator().getValue(i);
+            } else {
+                if (maximaSinceLastOpposite == null || contradictsPivot(maximaSinceLastOpposite, getPivotIndicator().getValue(i))) {
+                    maximaSinceLastOpposite = getPivotIndicator().getValue(i);
                 }
             }
         }
-        return true;
+        return map;
     }
 
+    private boolean isConfirmed(int index, int currentCalculationTick) {
+        Num valueToCheck = getPivotIndicator().getValue(index);
+        int endIndex = Math.min(getBarSeries().getEndIndex(), currentCalculationTick);
+        Num lastConfirmation = getConfirmationIndicator().getValue(index);
+
+        int confirmations = 0;
+        for (int inFrameIndex = index + 1; inFrameIndex <= endIndex; inFrameIndex++) {
+            Num otherValue = getPivotIndicator().getValue(inFrameIndex);
+            if (contradictsPivot(valueToCheck, otherValue)) {
+                return false;
+            }
+            Num confirmationValue = getConfirmationIndicator().getValue(inFrameIndex);
+            if (contradictsPivot(confirmationValue, lastConfirmation)) {
+                confirmations++;
+                if (confirmations>=amountConfirmationsNeeded) {
+                    return true;
+                }
+                lastConfirmation = confirmationValue;
+            }
+        }
+        return false;
+    }
+
+    public void setOppositPivotIndicator(MovingPivotPointIndicator oppositPivotIndicator) {
+        this.oppositPivotIndicator = oppositPivotIndicator;
+    }
+
+    protected abstract Indicator<Num> getConfirmationIndicator();
+
     protected abstract Indicator<Num> getPivotIndicator();
+
+    protected abstract Num getValueAt(int index, int currentCalculationTick);
 
     protected abstract boolean contradictsPivot(Num valueToCheck, Num otherValue);
 }

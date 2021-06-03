@@ -139,7 +139,7 @@ public class IntelligentTa4jOhlcBenchmarks {
         //upPercentage = 10;
         upPercentage = 1.309;
         upPercentage = 1.1545;
-        //upPercentage = 2;
+        upPercentage = 2;
 
         //lookback_max = 11;
         lookback_max = 400;
@@ -158,8 +158,6 @@ public class IntelligentTa4jOhlcBenchmarks {
                     String uuid = UUID.randomUUID().toString();
                     ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
 
-                    int pivotCalculationFrame = k;
-
                     EMAIndicator longEma = new EMAIndicator(closePriceIndicator, i);
                     EMAIndicator shortEma = new EMAIndicator(closePriceIndicator, j);
                     RSIIndicator rsi = new RSIIndicator(new ClosePriceIndicator(series), 14);
@@ -169,14 +167,35 @@ public class IntelligentTa4jOhlcBenchmarks {
                     TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
                     CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
 
-                    LowestPivotPointIndicator lastLow = new LowestPivotPointIndicator(series, pivotCalculationFrame, uuid,l );
-                    LowestPivotPointIndicator rsiAtLastLow = new LowestPivotPointIndicator(series, rsi, pivotCalculationFrame, uuid,l);
+                    LowestPivotPointIndicator lastLow = new LowestPivotPointIndicator(series, uuid,l );
+                    HighestPivotPointIndicator lastHigh = new HighestPivotPointIndicator(series, uuid, l);
+                    lastLow.setOppositPivotIndicator(lastHigh);
+                    lastHigh.setOppositPivotIndicator(lastLow);
 
-                    LowestPivotPointIndicator secondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), pivotCalculationFrame, uuid,l);
-                    LowestPivotPointIndicator rsiAtSecondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), pivotCalculationFrame, uuid,l);
+                    LowestPivotPointIndicator rsiAtLastLow = new LowestPivotPointIndicator(series, rsi, uuid,l);
+                    HighestPivotPointIndicator rsiAtLastHigh = new HighestPivotPointIndicator(series, rsi, uuid,l);
+                    rsiAtLastHigh.setOppositPivotIndicator(rsiAtLastLow);
+                    rsiAtLastLow.setOppositPivotIndicator(rsiAtLastHigh);
 
-                    LowestPivotPointIndicator thirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(secondLastLow, 1), pivotCalculationFrame, uuid,l);
-                    LowestPivotPointIndicator rsiAtThirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtSecondLastLow, 1), pivotCalculationFrame, uuid,l);
+                    LowestPivotPointIndicator secondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
+                    HighestPivotPointIndicator secondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
+                    secondLastLow.setOppositPivotIndicator(secondLastHigh);
+                    secondLastHigh.setOppositPivotIndicator(secondLastLow);
+
+                    LowestPivotPointIndicator rsiAtSecondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
+                    HighestPivotPointIndicator rsiAtSecondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
+                    rsiAtSecondLastLow.setOppositPivotIndicator(rsiAtSecondLastHigh);
+                    rsiAtSecondLastHigh.setOppositPivotIndicator(rsiAtSecondLastLow);
+
+                    LowestPivotPointIndicator thirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(secondLastLow, 1), uuid,l);
+                    HighestPivotPointIndicator thirdLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(secondLastLow, 1), uuid,l);
+                    thirdLastLow.setOppositPivotIndicator(thirdLastHigh);
+                    thirdLastHigh.setOppositPivotIndicator(thirdLastLow);
+
+                    LowestPivotPointIndicator rsiAtThirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtSecondLastLow, 1), uuid,l);
+                    HighestPivotPointIndicator rsiAtThirdLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(rsiAtSecondLastLow, 1), uuid,l);
+                    rsiAtThirdLastLow.setOppositPivotIndicator(rsiAtThirdLastHigh);
+                    rsiAtThirdLastHigh.setOppositPivotIndicator(rsiAtThirdLastLow);
 
                     Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
                     Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
@@ -197,7 +216,7 @@ public class IntelligentTa4jOhlcBenchmarks {
 
                     Rule hiddenDivergence = hiddenDivergenceBetweenLastTwo.or(hiddenDivergenceBetweenLastAndThird);
 
-                    Rule lastLowIsInFrame = new IsEqualRule(lastLow, new LowestValueIndicator(new LowPriceIndicator(series), pivotCalculationFrame+1));
+                    Rule lastLowIsInFrame = new IsEqualRule(lastLow, new LowestValueIndicator(new LowPriceIndicator(series), k));
                     Rule longEntryRule = upTrend
                             .and(priceOverLongReversalArea)
                             .and(hiddenDivergence)
@@ -220,8 +239,6 @@ public class IntelligentTa4jOhlcBenchmarks {
                     String uuid = UUID.randomUUID().toString();
                     ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
 
-                    int pivotCalculationFrame = k;
-
                     EMAIndicator longEma = new EMAIndicator(closePriceIndicator, i);
                     EMAIndicator shortEma = new EMAIndicator(closePriceIndicator, j);
                     RSIIndicator rsi = new RSIIndicator(new ClosePriceIndicator(series), 14);
@@ -231,14 +248,35 @@ public class IntelligentTa4jOhlcBenchmarks {
                     TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
                     CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
 
-                    LowestPivotPointIndicator lastLow = new LowestPivotPointIndicator(series, pivotCalculationFrame, uuid, l);
-                    LowestPivotPointIndicator rsiAtLastLow = new LowestPivotPointIndicator(series, rsi, pivotCalculationFrame, uuid, l);
+                    LowestPivotPointIndicator lastLow = new LowestPivotPointIndicator(series, uuid,l );
+                    HighestPivotPointIndicator lastHigh = new HighestPivotPointIndicator(series, uuid, l);
+                    lastLow.setOppositPivotIndicator(lastHigh);
+                    lastHigh.setOppositPivotIndicator(lastLow);
 
-                    LowestPivotPointIndicator secondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), pivotCalculationFrame, uuid, l);
-                    LowestPivotPointIndicator rsiAtSecondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), pivotCalculationFrame, uuid, l);
+                    LowestPivotPointIndicator rsiAtLastLow = new LowestPivotPointIndicator(series, rsi, uuid,l);
+                    HighestPivotPointIndicator rsiAtLastHigh = new HighestPivotPointIndicator(series, rsi, uuid,l);
+                    rsiAtLastHigh.setOppositPivotIndicator(rsiAtLastLow);
+                    rsiAtLastLow.setOppositPivotIndicator(rsiAtLastHigh);
 
-                    LowestPivotPointIndicator thirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(secondLastLow, 1), pivotCalculationFrame, uuid, l);
-                    LowestPivotPointIndicator rsiAtThirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtSecondLastLow, 1), pivotCalculationFrame, uuid, l);
+                    LowestPivotPointIndicator secondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
+                    HighestPivotPointIndicator secondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
+                    secondLastLow.setOppositPivotIndicator(secondLastHigh);
+                    secondLastHigh.setOppositPivotIndicator(secondLastLow);
+
+                    LowestPivotPointIndicator rsiAtSecondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
+                    HighestPivotPointIndicator rsiAtSecondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
+                    rsiAtSecondLastLow.setOppositPivotIndicator(rsiAtSecondLastHigh);
+                    rsiAtSecondLastHigh.setOppositPivotIndicator(rsiAtSecondLastLow);
+
+                    LowestPivotPointIndicator thirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(secondLastLow, 1), uuid,l);
+                    HighestPivotPointIndicator thirdLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(secondLastLow, 1), uuid,l);
+                    thirdLastLow.setOppositPivotIndicator(thirdLastHigh);
+                    thirdLastHigh.setOppositPivotIndicator(thirdLastLow);
+
+                    LowestPivotPointIndicator rsiAtThirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtSecondLastLow, 1), uuid,l);
+                    HighestPivotPointIndicator rsiAtThirdLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(rsiAtSecondLastLow, 1), uuid,l);
+                    rsiAtThirdLastLow.setOppositPivotIndicator(rsiAtThirdLastHigh);
+                    rsiAtThirdLastHigh.setOppositPivotIndicator(rsiAtThirdLastLow);
 
                     Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
                     Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
@@ -259,7 +297,7 @@ public class IntelligentTa4jOhlcBenchmarks {
 
                     Rule hiddenDivergence = hiddenDivergenceBetweenLastTwo.or(hiddenDivergenceBetweenLastAndThird);
 
-                    Rule lastLowIsInFrame = new IsEqualRule(lastLow, new LowestValueIndicator(new LowPriceIndicator(series), pivotCalculationFrame+1));
+                    Rule lastLowIsInFrame = new IsEqualRule(lastLow, new LowestValueIndicator(new LowPriceIndicator(series), k));
                     Rule longEntryRule = upTrend
                             .and(priceOverLongReversalArea)
                             .and(hiddenDivergence)
@@ -285,35 +323,45 @@ public class IntelligentTa4jOhlcBenchmarks {
                     String uuid = UUID.randomUUID().toString();
                     ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
 
-                    int pivotCalculationFrame = k;
-
                     EMAIndicator longEma = new EMAIndicator(closePriceIndicator, i);
                     EMAIndicator shortEma = new EMAIndicator(closePriceIndicator, j);
                     RSIIndicator rsi = new RSIIndicator(new ClosePriceIndicator(series), 14);
 
-                    LowestPivotPointIndicator lowPivotPoints = new LowestPivotPointIndicator(series, pivotCalculationFrame, uuid, l);
                     ATRIndicator trueRangeIndicator = new ATRIndicator(series, 14);
                     TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
                     CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
 
-                    LowestPivotPointIndicator rsiAtLowPivotPoints = new LowestPivotPointIndicator(series, rsi, pivotCalculationFrame, uuid, l);
-                    DelayIndicator previousPivotCalculation = new DelayIndicator(lowPivotPoints, 1);
-                    LowestPivotPointIndicator previousLowPivotPoint = new LowestPivotPointIndicator(series, previousPivotCalculation, pivotCalculationFrame, uuid, l);
+                    LowestPivotPointIndicator lastLow = new LowestPivotPointIndicator(series, uuid,l );
+                    HighestPivotPointIndicator lastHigh = new HighestPivotPointIndicator(series, uuid, l);
+                    lastLow.setOppositPivotIndicator(lastHigh);
+                    lastHigh.setOppositPivotIndicator(lastLow);
+
+                    LowestPivotPointIndicator rsiAtLastLow = new LowestPivotPointIndicator(series, rsi, uuid,l);
+                    HighestPivotPointIndicator rsiAtLastHigh = new HighestPivotPointIndicator(series, rsi, uuid,l);
+                    rsiAtLastHigh.setOppositPivotIndicator(rsiAtLastLow);
+                    rsiAtLastLow.setOppositPivotIndicator(rsiAtLastHigh);
+
+                    LowestPivotPointIndicator secondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
+                    HighestPivotPointIndicator secondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
+                    secondLastLow.setOppositPivotIndicator(secondLastHigh);
+                    secondLastHigh.setOppositPivotIndicator(secondLastLow);
+
+                    LowestPivotPointIndicator rsiAtSecondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
+                    HighestPivotPointIndicator rsiAtSecondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
+                    rsiAtSecondLastLow.setOppositPivotIndicator(rsiAtSecondLastHigh);
+                    rsiAtSecondLastHigh.setOppositPivotIndicator(rsiAtSecondLastLow);
 
                     Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
                     Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
-                    Rule lowPriceMovesUp = new OverIndicatorRule(lowPivotPoints, previousLowPivotPoint);
-                    DelayIndicator rsiAtPreviousPivotCalculation = new DelayIndicator(rsiAtLowPivotPoints, 1);
-
-                    LowestPivotPointIndicator rsiAtPreviousLowPivotPoints = new LowestPivotPointIndicator(series, rsiAtPreviousPivotCalculation, pivotCalculationFrame, uuid, l);
-                    Rule oversoldIndicatorMovesDown = new UnderIndicatorRule(rsiAtLowPivotPoints, rsiAtPreviousLowPivotPoints);
+                    Rule lowPriceMovesUp = new OverIndicatorRule(lastLow, secondLastLow);
+                    Rule oversoldIndicatorMovesDown = new UnderIndicatorRule(rsiAtLastLow, rsiAtSecondLastLow);
 
                     Rule candleStickPattern = new BooleanIndicatorRule(new BullishEngulfingIndicator(series))
                             .or(new BooleanIndicatorRule(new BullishHaramiIndicator(series)))
                             //.or(new BooleanIndicatorRule(new ThreeWhiteSoldiersIndicator(series, pivotCalculationFrame, series.numOf(0.1))))
                             ;
 
-                    Rule lastLowIsInFrame = new IsEqualRule(lowPivotPoints, new LowestValueIndicator(new LowPriceIndicator(series), pivotCalculationFrame+1));
+                    Rule lastLowIsInFrame = new IsEqualRule(lastLow, new LowestValueIndicator(new LowPriceIndicator(series), k));
                     Rule longEntryRule = upTrend
                             .and(priceOverLongReversalArea)
                             .and(lowPriceMovesUp)
@@ -337,35 +385,45 @@ public class IntelligentTa4jOhlcBenchmarks {
                     String uuid = UUID.randomUUID().toString();
                     ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
 
-                    int pivotCalculationFrame = k;
-
                     EMAIndicator longEma = new EMAIndicator(closePriceIndicator, i);
                     EMAIndicator shortEma = new EMAIndicator(closePriceIndicator, j);
                     RSIIndicator rsi = new RSIIndicator(new ClosePriceIndicator(series), 14);
 
-                    LowestPivotPointIndicator lowPivotPoints = new LowestPivotPointIndicator(series, pivotCalculationFrame, uuid, l);
                     ATRIndicator trueRangeIndicator = new ATRIndicator(series, 14);
                     TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
                     CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
 
-                    LowestPivotPointIndicator rsiAtLowPivotPoints = new LowestPivotPointIndicator(series, rsi, pivotCalculationFrame, uuid, l);
-                    DelayIndicator previousPivotCalculation = new DelayIndicator(lowPivotPoints, 1);
-                    LowestPivotPointIndicator previousLowPivotPoint = new LowestPivotPointIndicator(series, previousPivotCalculation, pivotCalculationFrame, uuid, l);
+                    LowestPivotPointIndicator lastLow = new LowestPivotPointIndicator(series, uuid,l );
+                    HighestPivotPointIndicator lastHigh = new HighestPivotPointIndicator(series, uuid, l);
+                    lastLow.setOppositPivotIndicator(lastHigh);
+                    lastHigh.setOppositPivotIndicator(lastLow);
+
+                    LowestPivotPointIndicator rsiAtLastLow = new LowestPivotPointIndicator(series, rsi, uuid,l);
+                    HighestPivotPointIndicator rsiAtLastHigh = new HighestPivotPointIndicator(series, rsi, uuid,l);
+                    rsiAtLastHigh.setOppositPivotIndicator(rsiAtLastLow);
+                    rsiAtLastLow.setOppositPivotIndicator(rsiAtLastHigh);
+
+                    LowestPivotPointIndicator secondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
+                    HighestPivotPointIndicator secondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
+                    secondLastLow.setOppositPivotIndicator(secondLastHigh);
+                    secondLastHigh.setOppositPivotIndicator(secondLastLow);
+
+                    LowestPivotPointIndicator rsiAtSecondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
+                    HighestPivotPointIndicator rsiAtSecondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
+                    rsiAtSecondLastLow.setOppositPivotIndicator(rsiAtSecondLastHigh);
+                    rsiAtSecondLastHigh.setOppositPivotIndicator(rsiAtSecondLastLow);
 
                     Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
                     Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
-                    Rule lowPriceMovesUp = new OverIndicatorRule(lowPivotPoints, previousLowPivotPoint);
-                    DelayIndicator rsiAtPreviousPivotCalculation = new DelayIndicator(rsiAtLowPivotPoints, 1);
-
-                    LowestPivotPointIndicator rsiAtPreviousLowPivotPoints = new LowestPivotPointIndicator(series, rsiAtPreviousPivotCalculation, pivotCalculationFrame, uuid, l);
-                    Rule oversoldIndicatorMovesDown = new UnderIndicatorRule(rsiAtLowPivotPoints, rsiAtPreviousLowPivotPoints);
+                    Rule lowPriceMovesUp = new OverIndicatorRule(lastLow, secondLastLow);
+                    Rule oversoldIndicatorMovesDown = new UnderIndicatorRule(rsiAtLastLow, rsiAtSecondLastLow);
 
                     Rule candleStickPattern = new BooleanIndicatorRule(new BullishEngulfingIndicator(series))
                             .or(new BooleanIndicatorRule(new BullishHaramiIndicator(series)))
                             //.or(new BooleanIndicatorRule(new ThreeWhiteSoldiersIndicator(series, pivotCalculationFrame, series.numOf(0.1))))
                             ;
 
-                    Rule lastLowIsInFrame = new IsEqualRule(lowPivotPoints, new LowestValueIndicator(new LowPriceIndicator(series), pivotCalculationFrame+1));
+                    Rule lastLowIsInFrame = new IsEqualRule(lastLow, new LowestValueIndicator(new LowPriceIndicator(series), k));
                     Rule longEntryRule = upTrend
                             .and(priceOverLongReversalArea)
                             .and(lowPriceMovesUp)
@@ -387,22 +445,21 @@ public class IntelligentTa4jOhlcBenchmarks {
                 i -> j -> k -> l -> series -> {
                     ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
                     String uuid = UUID.randomUUID().toString();
-                    int pivotCalculationFrame = k;
                     int chandelierExitMultiplier = l;
 
                     EMAIndicator longEma = new EMAIndicator(closePriceIndicator, i);
                     EMAIndicator shortEma = new EMAIndicator(closePriceIndicator, j);
                     RSIIndicator rsi = new RSIIndicator(new ClosePriceIndicator(series), 14);
 
-                    HighestPivotPointIndicator highPivotPoints = new HighestPivotPointIndicator(series, pivotCalculationFrame, uuid, 3);
-                    LowestPivotPointIndicator lowPivotPoints = new LowestPivotPointIndicator(series, pivotCalculationFrame, uuid, 3);
+                    HighestPivotPointIndicator highPivotPoints = new HighestPivotPointIndicator(series, uuid, 3);
+                    LowestPivotPointIndicator lowPivotPoints = new LowestPivotPointIndicator(series, uuid, 3);
                     ATRIndicator trueRangeIndicator = new ATRIndicator(series, 14);
                     TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
                     CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
                     CombineIndicator emaDownTrendLine = minus(longEma, trueRangeFactor);
 
-                    HighestPivotPointIndicator rsiAtHighPivotPoints = new HighestPivotPointIndicator(series, rsi, pivotCalculationFrame, uuid, 3);
-                    LowestPivotPointIndicator rsiAtLowPivotPoints = new LowestPivotPointIndicator(series, rsi, pivotCalculationFrame, uuid, 3);
+                    HighestPivotPointIndicator rsiAtHighPivotPoints = new HighestPivotPointIndicator(series, rsi, uuid, 3);
+                    LowestPivotPointIndicator rsiAtLowPivotPoints = new LowestPivotPointIndicator(series, rsi, uuid, 3);
 
                     Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
                     Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
