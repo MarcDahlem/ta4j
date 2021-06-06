@@ -203,7 +203,7 @@ public class IntelligentTa4jOhlcBenchmarks {
                     Rule hiddenDivergenceBetweenLastTwo = lowPriceMovesUp.and(oversoldIndicatorMovesDown);
                     Rule hiddenDivergenceBetweenLastAndThird = lowPriceMovesUpLooback2.and(oversoldIndicatorMovesDownLookback2);
 
-                    Rule hiddenDivergence = hiddenDivergenceBetweenLastTwo.or(hiddenDivergenceBetweenLastAndThird);
+                    Rule hiddenDivergence = hiddenDivergenceBetweenLastTwo.and(hiddenDivergenceBetweenLastAndThird);
 
                     Rule lastLowIsInFrame = new IsEqualRule(lastLow, new LowestValueIndicator(new LowPriceIndicator(series), k));
                     Rule longEntryRule = upTrend
@@ -272,7 +272,7 @@ public class IntelligentTa4jOhlcBenchmarks {
                     Rule hiddenDivergenceBetweenLastTwo = lowPriceMovesUp.and(oversoldIndicatorMovesDown);
                     Rule hiddenDivergenceBetweenLastAndThird = lowPriceMovesUpLooback2.and(oversoldIndicatorMovesDownLookback2);
 
-                    Rule hiddenDivergence = hiddenDivergenceBetweenLastTwo.or(hiddenDivergenceBetweenLastAndThird);
+                    Rule hiddenDivergence = hiddenDivergenceBetweenLastTwo.and(hiddenDivergenceBetweenLastAndThird);
 
                     Rule lastLowIsInFrame = new IsEqualRule(lastLow, new LowestValueIndicator(new LowPriceIndicator(series), k));
                     Rule longEntryRule = upTrend

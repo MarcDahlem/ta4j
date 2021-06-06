@@ -29,13 +29,13 @@ public class ReversalPointsIndicator extends AbstractIndicator<Num> {
     private final HighPriceIndicator highPriceIndicator;
     private final LowPriceIndicator lowPriceIndicator;
     private final int amountConfirmationsNeeded;
-    private final Cache<Bar, ReversalComputationState> savedStates;
 
     private final ReversalType type;
     private final Indicator<Num> valueIndicator;
     private final ConcurrentSkipListSet<Integer> lows = new ConcurrentSkipListSet<>();
     private final ConcurrentSkipListSet<Integer> highs = new ConcurrentSkipListSet<>();
     private static final Map<String, Integer> latestSeenIndex = new HashMap<>();
+    private static final Map<String, Cache<Bar, ReversalComputationState>> strategyCaches = new HashMap<>();
 
     public ReversalPointsIndicator(BarSeries series, ReversalType type, String uuid,  int amountConfirmationsNeeded) {
         this(series, type, null, uuid,  amountConfirmationsNeeded);
@@ -48,7 +48,9 @@ public class ReversalPointsIndicator extends AbstractIndicator<Num> {
         this.highPriceIndicator = new HighPriceIndicator(series);
         this.lowPriceIndicator = new LowPriceIndicator(series);
         this.amountConfirmationsNeeded = amountConfirmationsNeeded;
-        savedStates = CacheBuilder.newBuilder().maximumSize(10).build();
+        if (!strategyCaches.containsKey(uuid)) {
+            strategyCaches.put(uuid, CacheBuilder.newBuilder().build());
+        }
         this.uuid = uuid;
     }
 
@@ -90,6 +92,7 @@ public class ReversalPointsIndicator extends AbstractIndicator<Num> {
 
         Bar currentBar = getBarSeries().getBar(currentCalculationTick);
         ReversalComputationState state = null;
+        Cache<Bar, ReversalComputationState> savedStates = strategyCaches.get(uuid);
         try {
             state = savedStates.get(currentBar, () -> {
                         ReversalComputationState result = new ReversalComputationState(highPriceIndicator, lowPriceIndicator, amountConfirmationsNeeded);
