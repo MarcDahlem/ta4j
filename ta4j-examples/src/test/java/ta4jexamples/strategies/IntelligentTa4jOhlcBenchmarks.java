@@ -107,6 +107,7 @@ import ta4jexamples.strategies.intelligenthelper.IntelligentJsonSeriesLoader;
 import ta4jexamples.strategies.intelligenthelper.IntelligentTrailIndicator;
 import ta4jexamples.strategies.intelligenthelper.JsonRecordingTimeInterval;
 import ta4jexamples.strategies.intelligenthelper.LowestPivotPointIndicator;
+import ta4jexamples.strategies.intelligenthelper.ReversalPointsIndicator;
 import ta4jexamples.strategies.intelligenthelper.TripleKeltnerChannelMiddleIndicator;
 
 public class IntelligentTa4jOhlcBenchmarks {
@@ -167,35 +168,23 @@ public class IntelligentTa4jOhlcBenchmarks {
                     TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
                     CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
 
-                    LowestPivotPointIndicator lastLow = new LowestPivotPointIndicator(series, uuid,l );
-                    HighestPivotPointIndicator lastHigh = new HighestPivotPointIndicator(series, uuid, l);
-                    lastLow.setOppositPivotIndicator(lastHigh);
-                    lastHigh.setOppositPivotIndicator(lastLow);
+                    ReversalPointsIndicator lastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, uuid,l );
+                    ReversalPointsIndicator lastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, uuid, l);
 
-                    LowestPivotPointIndicator rsiAtLastLow = new LowestPivotPointIndicator(series, rsi, uuid,l);
-                    HighestPivotPointIndicator rsiAtLastHigh = new HighestPivotPointIndicator(series, rsi, uuid,l);
-                    rsiAtLastHigh.setOppositPivotIndicator(rsiAtLastLow);
-                    rsiAtLastLow.setOppositPivotIndicator(rsiAtLastHigh);
+                    ReversalPointsIndicator rsiAtLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, rsi, uuid,l);
+                    ReversalPointsIndicator rsiAtLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, rsi, uuid,l);
 
-                    LowestPivotPointIndicator secondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
-                    HighestPivotPointIndicator secondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
-                    secondLastLow.setOppositPivotIndicator(secondLastHigh);
-                    secondLastHigh.setOppositPivotIndicator(secondLastLow);
+                    ReversalPointsIndicator secondLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, new DelayIndicator(lastLow, 1), uuid,l);
+                    ReversalPointsIndicator secondLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, new DelayIndicator(lastLow, 1), uuid,l);
 
-                    LowestPivotPointIndicator rsiAtSecondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
-                    HighestPivotPointIndicator rsiAtSecondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
-                    rsiAtSecondLastLow.setOppositPivotIndicator(rsiAtSecondLastHigh);
-                    rsiAtSecondLastHigh.setOppositPivotIndicator(rsiAtSecondLastLow);
+                    ReversalPointsIndicator rsiAtSecondLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
+                    ReversalPointsIndicator rsiAtSecondLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
 
-                    LowestPivotPointIndicator thirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(secondLastLow, 1), uuid,l);
-                    HighestPivotPointIndicator thirdLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(secondLastLow, 1), uuid,l);
-                    thirdLastLow.setOppositPivotIndicator(thirdLastHigh);
-                    thirdLastHigh.setOppositPivotIndicator(thirdLastLow);
+                    ReversalPointsIndicator thirdLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, new DelayIndicator(secondLastLow, 1), uuid,l);
+                    ReversalPointsIndicator thirdLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, new DelayIndicator(secondLastLow, 1), uuid,l);
 
-                    LowestPivotPointIndicator rsiAtThirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtSecondLastLow, 1), uuid,l);
-                    HighestPivotPointIndicator rsiAtThirdLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(rsiAtSecondLastLow, 1), uuid,l);
-                    rsiAtThirdLastLow.setOppositPivotIndicator(rsiAtThirdLastHigh);
-                    rsiAtThirdLastHigh.setOppositPivotIndicator(rsiAtThirdLastLow);
+                    ReversalPointsIndicator rsiAtThirdLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, new DelayIndicator(rsiAtSecondLastLow, 1), uuid,l);
+                    ReversalPointsIndicator rsiAtThirdLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, new DelayIndicator(rsiAtSecondLastLow, 1), uuid,l);
 
                     Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
                     Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
@@ -248,35 +237,23 @@ public class IntelligentTa4jOhlcBenchmarks {
                     TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
                     CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
 
-                    LowestPivotPointIndicator lastLow = new LowestPivotPointIndicator(series, uuid,l );
-                    HighestPivotPointIndicator lastHigh = new HighestPivotPointIndicator(series, uuid, l);
-                    lastLow.setOppositPivotIndicator(lastHigh);
-                    lastHigh.setOppositPivotIndicator(lastLow);
+                    ReversalPointsIndicator lastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, uuid,l );
+                    ReversalPointsIndicator lastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, uuid, l);
 
-                    LowestPivotPointIndicator rsiAtLastLow = new LowestPivotPointIndicator(series, rsi, uuid,l);
-                    HighestPivotPointIndicator rsiAtLastHigh = new HighestPivotPointIndicator(series, rsi, uuid,l);
-                    rsiAtLastHigh.setOppositPivotIndicator(rsiAtLastLow);
-                    rsiAtLastLow.setOppositPivotIndicator(rsiAtLastHigh);
+                    ReversalPointsIndicator rsiAtLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, rsi, uuid,l);
+                    ReversalPointsIndicator rsiAtLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, rsi, uuid,l);
 
-                    LowestPivotPointIndicator secondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
-                    HighestPivotPointIndicator secondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
-                    secondLastLow.setOppositPivotIndicator(secondLastHigh);
-                    secondLastHigh.setOppositPivotIndicator(secondLastLow);
+                    ReversalPointsIndicator secondLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, new DelayIndicator(lastLow, 1), uuid,l);
+                    ReversalPointsIndicator secondLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, new DelayIndicator(lastLow, 1), uuid,l);
 
-                    LowestPivotPointIndicator rsiAtSecondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
-                    HighestPivotPointIndicator rsiAtSecondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
-                    rsiAtSecondLastLow.setOppositPivotIndicator(rsiAtSecondLastHigh);
-                    rsiAtSecondLastHigh.setOppositPivotIndicator(rsiAtSecondLastLow);
+                    ReversalPointsIndicator rsiAtSecondLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
+                    ReversalPointsIndicator rsiAtSecondLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
 
-                    LowestPivotPointIndicator thirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(secondLastLow, 1), uuid,l);
-                    HighestPivotPointIndicator thirdLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(secondLastLow, 1), uuid,l);
-                    thirdLastLow.setOppositPivotIndicator(thirdLastHigh);
-                    thirdLastHigh.setOppositPivotIndicator(thirdLastLow);
+                    ReversalPointsIndicator thirdLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, new DelayIndicator(secondLastLow, 1), uuid,l);
+                    ReversalPointsIndicator thirdLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, new DelayIndicator(secondLastLow, 1), uuid,l);
 
-                    LowestPivotPointIndicator rsiAtThirdLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtSecondLastLow, 1), uuid,l);
-                    HighestPivotPointIndicator rsiAtThirdLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(rsiAtSecondLastLow, 1), uuid,l);
-                    rsiAtThirdLastLow.setOppositPivotIndicator(rsiAtThirdLastHigh);
-                    rsiAtThirdLastHigh.setOppositPivotIndicator(rsiAtThirdLastLow);
+                    ReversalPointsIndicator rsiAtThirdLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, new DelayIndicator(rsiAtSecondLastLow, 1), uuid,l);
+                    ReversalPointsIndicator rsiAtThirdLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, new DelayIndicator(rsiAtSecondLastLow, 1), uuid,l);
 
                     Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
                     Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
@@ -331,25 +308,17 @@ public class IntelligentTa4jOhlcBenchmarks {
                     TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
                     CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
 
-                    LowestPivotPointIndicator lastLow = new LowestPivotPointIndicator(series, uuid,l );
-                    HighestPivotPointIndicator lastHigh = new HighestPivotPointIndicator(series, uuid, l);
-                    lastLow.setOppositPivotIndicator(lastHigh);
-                    lastHigh.setOppositPivotIndicator(lastLow);
+                    ReversalPointsIndicator lastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, uuid,l );
+                    ReversalPointsIndicator lastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, uuid, l);
 
-                    LowestPivotPointIndicator rsiAtLastLow = new LowestPivotPointIndicator(series, rsi, uuid,l);
-                    HighestPivotPointIndicator rsiAtLastHigh = new HighestPivotPointIndicator(series, rsi, uuid,l);
-                    rsiAtLastHigh.setOppositPivotIndicator(rsiAtLastLow);
-                    rsiAtLastLow.setOppositPivotIndicator(rsiAtLastHigh);
+                    ReversalPointsIndicator rsiAtLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, rsi, uuid,l);
+                    ReversalPointsIndicator rsiAtLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, rsi, uuid,l);
 
-                    LowestPivotPointIndicator secondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
-                    HighestPivotPointIndicator secondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
-                    secondLastLow.setOppositPivotIndicator(secondLastHigh);
-                    secondLastHigh.setOppositPivotIndicator(secondLastLow);
+                    ReversalPointsIndicator secondLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, new DelayIndicator(lastLow, 1), uuid,l);
+                    ReversalPointsIndicator secondLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, new DelayIndicator(lastLow, 1), uuid,l);
 
-                    LowestPivotPointIndicator rsiAtSecondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
-                    HighestPivotPointIndicator rsiAtSecondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
-                    rsiAtSecondLastLow.setOppositPivotIndicator(rsiAtSecondLastHigh);
-                    rsiAtSecondLastHigh.setOppositPivotIndicator(rsiAtSecondLastLow);
+                    ReversalPointsIndicator rsiAtSecondLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
+                    ReversalPointsIndicator rsiAtSecondLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
 
                     Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
                     Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
@@ -393,25 +362,17 @@ public class IntelligentTa4jOhlcBenchmarks {
                     TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
                     CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
 
-                    LowestPivotPointIndicator lastLow = new LowestPivotPointIndicator(series, uuid,l );
-                    HighestPivotPointIndicator lastHigh = new HighestPivotPointIndicator(series, uuid, l);
-                    lastLow.setOppositPivotIndicator(lastHigh);
-                    lastHigh.setOppositPivotIndicator(lastLow);
+                    ReversalPointsIndicator lastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, uuid,l );
+                    ReversalPointsIndicator lastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, uuid, l);
 
-                    LowestPivotPointIndicator rsiAtLastLow = new LowestPivotPointIndicator(series, rsi, uuid,l);
-                    HighestPivotPointIndicator rsiAtLastHigh = new HighestPivotPointIndicator(series, rsi, uuid,l);
-                    rsiAtLastHigh.setOppositPivotIndicator(rsiAtLastLow);
-                    rsiAtLastLow.setOppositPivotIndicator(rsiAtLastHigh);
+                    ReversalPointsIndicator rsiAtLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, rsi, uuid,l);
+                    ReversalPointsIndicator rsiAtLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, rsi, uuid,l);
 
-                    LowestPivotPointIndicator secondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
-                    HighestPivotPointIndicator secondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(lastLow, 1), uuid,l);
-                    secondLastLow.setOppositPivotIndicator(secondLastHigh);
-                    secondLastHigh.setOppositPivotIndicator(secondLastLow);
+                    ReversalPointsIndicator secondLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, new DelayIndicator(lastLow, 1), uuid,l);
+                    ReversalPointsIndicator secondLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, new DelayIndicator(lastLow, 1), uuid,l);
 
-                    LowestPivotPointIndicator rsiAtSecondLastLow = new LowestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
-                    HighestPivotPointIndicator rsiAtSecondLastHigh = new HighestPivotPointIndicator(series, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
-                    rsiAtSecondLastLow.setOppositPivotIndicator(rsiAtSecondLastHigh);
-                    rsiAtSecondLastHigh.setOppositPivotIndicator(rsiAtSecondLastLow);
+                    ReversalPointsIndicator rsiAtSecondLastLow = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
+                    ReversalPointsIndicator rsiAtSecondLastHigh = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, new DelayIndicator(rsiAtLastLow, 1), uuid,l);
 
                     Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
                     Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
@@ -451,15 +412,15 @@ public class IntelligentTa4jOhlcBenchmarks {
                     EMAIndicator shortEma = new EMAIndicator(closePriceIndicator, j);
                     RSIIndicator rsi = new RSIIndicator(new ClosePriceIndicator(series), 14);
 
-                    HighestPivotPointIndicator highPivotPoints = new HighestPivotPointIndicator(series, uuid, 3);
-                    LowestPivotPointIndicator lowPivotPoints = new LowestPivotPointIndicator(series, uuid, 3);
+                    ReversalPointsIndicator highPivotPoints = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, uuid, 3);
+                    ReversalPointsIndicator lowPivotPoints = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, uuid, 3);
                     ATRIndicator trueRangeIndicator = new ATRIndicator(series, 14);
                     TransformIndicator trueRangeFactor = multiply(trueRangeIndicator, 2);
                     CombineIndicator emaUpTrendLine = plus(longEma, trueRangeFactor);
                     CombineIndicator emaDownTrendLine = minus(longEma, trueRangeFactor);
 
-                    HighestPivotPointIndicator rsiAtHighPivotPoints = new HighestPivotPointIndicator(series, rsi, uuid, 3);
-                    LowestPivotPointIndicator rsiAtLowPivotPoints = new LowestPivotPointIndicator(series, rsi, uuid, 3);
+                    ReversalPointsIndicator rsiAtHighPivotPoints = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.HIGHS, rsi, uuid, 3);
+                    ReversalPointsIndicator rsiAtLowPivotPoints = new ReversalPointsIndicator(series, ReversalPointsIndicator.ReversalType.LOWS, rsi, uuid, 3);
 
                     Rule upTrend = new OverIndicatorRule(shortEma, emaUpTrendLine);
                     Rule priceOverLongReversalArea = new OverIndicatorRule(closePriceIndicator, emaUpTrendLine);
@@ -958,8 +919,8 @@ public class IntelligentTa4jOhlcBenchmarks {
 
         for (long i = 1; i < lookback_max; i = Math.round(Math.ceil(i * upPercentage))) {
             for (long j = 1; j < i; j = Math.round(Math.ceil(j * upPercentage))) {
-                for (long k = 1; k < 33; k = Math.round(Math.ceil(k * upPercentage))) {
-                    for (long l = 1; l < 33; l = Math.round(Math.ceil(l * upPercentage))) {
+                for (long k = 1; k < 17; k = Math.round(Math.ceil(k * upPercentage))) {
+                    for (long l = 1; l < 17; l = Math.round(Math.ceil(l * upPercentage))) {
                         String currentStrategyName = "i(" + i + "), j(" + j + "), k(" + k + "),l(" + l + ")";
                         LOG.info(currentStrategyName);
                         List<StrategyConfiguration> strategiesForTheSeries = new LinkedList<>();
